@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thali Plan — Kitchen Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#1E1B18; --panel:#28231F; --panel-2:#332C26; --line:#433A32;
+    --turmeric:#D9A441; --curry:#6B8F5C; --chili:#C24A3B; --sky:#8FA6C4;
+    --text:#F1EAE0; --text-dim:#B7ACA0; --text-faint:#8A7E72;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased; }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  header.top{ padding:22px 26px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; position:sticky; top:0; background:var(--bg); z-index:10; }
+  .brand{ display:flex; align-items:baseline; gap:10px; }
+  .brand-mark{ width:30px;height:30px; border-radius:50%; border:2px solid var(--turmeric); position:relative; flex-shrink:0; }
+  .brand-mark::before,.brand-mark::after{ content:''; position:absolute; background:var(--line); }
+  .brand-mark::before{ width:1px; height:100%; left:50%; }
+  .brand-mark::after{ width:100%; height:1px; top:50%; }
+  .brand h1{ font-size:19px; margin:0; font-weight:600; }
+  .brand span{ color:var(--text-faint); font-size:12px; font-family:'IBM Plex Mono',monospace; }
+  .badge-veg{ font-size:12px; font-family:'IBM Plex Mono',monospace; color:var(--curry); border:1px solid var(--curry); border-radius:999px; padding:6px 14px; }
+  .header-right{ display:flex; align-items:center; gap:12px; }
+  .clock{ font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--text-dim); }
+  .refresh-btn{ background:var(--panel); border:1px solid var(--line); color:var(--text-dim); padding:8px 14px; border-radius:8px; font-size:12.5px; cursor:pointer; }
+  .tabs{ display:flex; background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:4px; gap:4px; }
+  .tabs button{ border:none; background:transparent; color:var(--text-dim); font-family:'IBM Plex Mono',monospace; font-size:11.5px; letter-spacing:0.04em; text-transform:uppercase; padding:8px 16px; border-radius:999px; cursor:pointer; }
+  .tabs button.active{ background:var(--turmeric); color:#1E1B18; font-weight:600; }
+
+  main{ max-width:1160px; margin:0 auto; padding:26px; }
+  .tabview{ display:none; } .tabview.active{ display:block; }
+
+  .stat-row{ display:flex; gap:16px; margin-bottom:24px; flex-wrap:wrap; }
+  .stat{ flex:1; min-width:150px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 18px; }
+  .stat .num{ font-family:'Fraunces',serif; font-size:28px; color:var(--turmeric); }
+  .stat .lbl{ font-size:11.5px; color:var(--text-faint); font-family:'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:.05em; margin-top:2px;}
+
+  .section-title{ font-family:'Fraunces',serif; font-size:19px; margin:28px 0 14px; font-weight:600; display:flex; align-items:center; gap:10px; }
+  .section-title:first-of-type{ margin-top:0; }
+  .section-title .slot-window{ font-size:12px; font-family:'IBM Plex Mono',monospace; color:var(--text-faint); font-weight:400; }
+
+  .dish-card{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin-bottom:12px; }
+  .dish-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .dish-name{ font-size:16px; font-weight:600; }
+  .dish-qty{ font-family:'IBM Plex Mono',monospace; font-size:22px; color:var(--turmeric); font-weight:700; white-space:nowrap; }
+  .dish-meta-row{ display:flex; gap:18px; flex-wrap:wrap; margin-top:12px; }
+  .dish-meta-block{ flex:1; min-width:200px; }
+  .dish-meta-block h5{ margin:0 0 5px; font-size:10.5px; font-family:'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:.05em; color:var(--text-faint); }
+  .ingredient-list{ display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+  .ingredient-chip{ font-size:11.5px; background:var(--panel-2); border:1px solid var(--line); border-radius:999px; padding:3px 10px; color:var(--text-dim); }
+  .time-pill{ display:inline-block; font-family:'IBM Plex Mono',monospace; font-size:11.5px; background:var(--panel-2); border:1px solid var(--line); border-radius:999px; padding:4px 11px; }
+  .time-pill.urgent{ border-color:var(--chili); color:var(--chili); }
+
+  table.orders{ width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-top:6px; }
+  table.orders th{ text-align:left; font-family:'IBM Plex Mono',monospace; text-transform:uppercase; font-size:10.5px; letter-spacing:.05em; color:var(--text-faint); padding:11px 14px; border-bottom:1px solid var(--line); background:var(--panel-2); }
+  table.orders td{ padding:11px 14px; border-bottom:1px solid var(--line); font-size:13px; vertical-align:top; }
+  table.orders tr:last-child td{ border-bottom:none; }
+  .paid-tag{ font-size:10.5px; font-family:'IBM Plex Mono',monospace; border-radius:999px; padding:2px 9px; display:inline-block; }
+  .paid-tag.yes{ color:var(--curry); border:1px solid var(--curry); }
+  .paid-tag.no{ color:var(--chili); border:1px solid var(--chili); }
+  .row-actions{ display:flex; gap:6px; flex-wrap:wrap; }
+  .row-actions button{ font-size:11px; padding:6px 10px; border-radius:6px; border:1px solid var(--line); background:var(--panel-2); color:var(--text-dim); cursor:pointer; }
+  .row-actions button.deliver{ border-color:var(--curry); color:var(--curry); }
+  .row-actions button.markpaid{ border-color:var(--turmeric); color:var(--turmeric); }
+
+  .note{ font-size:12.5px; color:var(--text-faint); line-height:1.6; margin-top:22px; padding-top:16px; border-top:1px solid var(--line); }
+  .empty-note{ color:var(--text-faint); font-size:13px; padding:14px 0; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <div class="brand-mark"></div>
+    <div><h1>Thali Plan</h1><span>kitchen dashboard — Home Kitchen</span></div>
+  </div>
+  <div class="badge-veg">🌱 Vegetarian kitchen</div>
+  <div class="header-right">
+    <div class="tabs">
+      <button class="active" data-tab="active">Active</button>
+      <button data-tab="history">History</button>
+    </div>
+    <span class="clock" id="clock"></span>
+    <button class="refresh-btn" id="refresh-btn">↻ Refresh</button>
+  </div>
+</header>
+
+<main>
+
+  <div class="tabview active" id="tab-active">
+    <div class="stat-row" id="kitchen-stats"></div>
+
+    <div class="section-title">Breakfast <span class="slot-window" id="window-Breakfast"></span></div>
+    <div id="dishes-Breakfast"></div>
+
+    <div class="section-title">Lunch <span class="slot-window" id="window-Lunch"></span></div>
+    <div id="dishes-Lunch"></div>
+
+    <div class="section-title">Dinner <span class="slot-window" id="window-Dinner"></span></div>
+    <div id="dishes-Dinner"></div>
+
+    <div class="section-title">Individual active orders</div>
+    <table class="orders" id="orders-table"></table>
+  </div>
+
+  <div class="tabview" id="tab-history">
+    <div class="section-title">Delivered orders</div>
+    <table class="orders" id="history-table"></table>
+  </div>
+
+</main>
+
+<script>
+const API_BASE = 'http://localhost:3000/api';
+const THIS_KITCHEN_ID = 'home-kitchen';
+
+const FOODS = [
+  { name:'Ragi dosa (2)', ingredients:['ragi flour','urad dal','curry leaves'] },
+  { name:'Moong dal + rice', ingredients:['moong dal','rice','turmeric','ghee'] },
+  { name:'Paneer bhurji', ingredients:['paneer','onion','tomato','capsicum'] },
+  { name:'Curd (1 cup)', ingredients:['fresh curd'] },
+  { name:'Spinach sabzi', ingredients:['spinach','garlic','onion'] },
+  { name:'Amla (2 pcs)', ingredients:['fresh amla'] },
+  { name:'Milk (1 glass)', ingredients:['toned milk'] },
+  { name:'Sprouts salad', ingredients:['moong sprouts','onion','lemon','coriander'] },
+  { name:'Banana', ingredients:['banana'] },
+  { name:'Fortified cereal bowl', ingredients:['fortified wheat flakes','milk'] },
+  { name:'Ragi mudde + sambar', ingredients:['ragi','toor dal','mixed vegetables','tamarind'] },
+  { name:'Mixed nuts trail', ingredients:['almonds','walnuts','raisins'] },
+  { name:'Rajma curry', ingredients:['kidney beans','onion','tomato','garam masala'] },
+  { name:'Mango bowl (seasonal)', ingredients:['fresh mango'] },
+  { name:'Jackfruit sabzi (seasonal)', ingredients:['raw jackfruit','coconut','mustard seeds'] },
+  { name:'Guava (2 pcs, seasonal)', ingredients:['fresh guava'] },
+  { name:'Avocado toast (multigrain)', ingredients:['avocado','multigrain bread','chili flakes'], prepExtra:30 },
+  { name:'Kiwi + chia bowl', ingredients:['kiwi','chia seeds','honey'], prepExtra:20 },
+  { name:'Almond milk latte', ingredients:['almond milk','espresso'], prepExtra:15 },
+  { name:'Quinoa + roasted veg bowl', ingredients:['quinoa','zucchini','bell pepper','olive oil'], prepExtra:30 },
+  { name:'Blueberries (1 bowl)', ingredients:['imported blueberries'], prepExtra:15 },
+  { name:'Almonds (10)', ingredients:['almonds'], prepExtra:10 },
+];
+function findFood(name){ return FOODS.find(f=>f.name===name) || { name, ingredients:['(details unavailable)'] }; }
+
+const LEAD_MINUTES_BASE = 120;
+
+function fmtTime(d){ return d.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' }); }
+function readyByTime(order, meal){
+  const items = order.itemsByMeal[meal] || [];
+  const extra = items.reduce((max,it)=>{ const f=findFood(it.name); return Math.max(max, f.prepExtra||0); }, 0);
+  return new Date(new Date(order.placedAt).getTime() + (LEAD_MINUTES_BASE+extra)*60000);
+}
+
+function renderClock(){ document.getElementById('clock').textContent = 'Now: ' + fmtTime(new Date()); }
+renderClock(); setInterval(renderClock, 30000);
+
+document.querySelectorAll('.tabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tabview').forEach(v=>v.classList.remove('active'));
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+let allOrders = [];
+
+// Fetch orders from real API
+async function loadOrders(){
+  try {
+    const res = await fetch(`${API_BASE}/orders/${THIS_KITCHEN_ID}`);
+    if (res.ok) {
+        allOrders = await res.json();
+        render();
+    }
+  } catch (err) {
+    console.error("Failed to load orders", err);
+  }
+}
+
+function render(){
+  const active = allOrders.filter(o=>o.status==='placed');
+  const delivered = allOrders.filter(o=>o.status==='delivered');
+  const now = new Date();
+
+  const totalItems = active.reduce((s,o)=> s + Object.values(o.itemsByMeal).flat().reduce((s2,i)=>s2+i.qty,0), 0);
+  const unpaid = active.filter(o=>!o.paid).length;
+  document.getElementById('kitchen-stats').innerHTML = `
+    <div class="stat"><div class="num">${active.length}</div><div class="lbl">Active orders</div></div>
+    <div class="stat"><div class="num">${totalItems}</div><div class="lbl">Total dishes to prepare</div></div>
+    <div class="stat"><div class="num">${unpaid}</div><div class="lbl">Awaiting payment</div></div>
+  `;
+
+  ['Breakfast','Lunch','Dinner'].forEach(meal=>{
+    const ordersForMeal = active.filter(o=>o.itemsByMeal[meal]);
+    const readyTimes = ordersForMeal.map(o=>readyByTime(o, meal));
+    document.getElementById('window-'+meal).textContent = ordersForMeal.length
+      ? `earliest ready-by ${fmtTime(readyTimes.sort((a,b)=>a-b)[0])} · latest ${fmtTime(readyTimes.sort((a,b)=>b-a)[0])}`
+      : 'no orders yet';
+
+    const agg = {};
+    ordersForMeal.forEach(o=>{
+      o.itemsByMeal[meal].forEach(it=>{
+        if(!agg[it.name]) agg[it.name] = { qty:0, readyTimes:[] };
+        agg[it.name].qty += it.qty;
+        agg[it.name].readyTimes.push(readyByTime(o, meal));
+      });
+    });
+    const container = document.getElementById('dishes-'+meal);
+    const entries = Object.entries(agg);
+    container.innerHTML = entries.length ? entries.map(([name, info])=>{
+      const food = findFood(name);
+      const earliestReady = info.readyTimes.sort((a,b)=>a-b)[0];
+      const isUrgent = (earliestReady - now) < 30*60000;
+      return `
+        <div class="dish-card">
+          <div class="dish-head"><div class="dish-name">${name}</div><div class="dish-qty">×${info.qty}</div></div>
+          <div class="dish-meta-row">
+            <div class="dish-meta-block">
+              <h5>Use only these ingredients</h5>
+              <div class="ingredient-list">${food.ingredients.map(i=>`<span class="ingredient-chip">${i}</span>`).join('')}</div>
+            </div>
+            <div class="dish-meta-block">
+              <h5>Ready by</h5>
+              <span class="time-pill ${isUrgent?'urgent':''}">${fmtTime(earliestReady)}${isUrgent?' — urgent':''}</span>
+            </div>
+          </div>
+        </div>`;
+    }).join('') : '<p class="empty-note">No orders for this meal yet.</p>';
+  });
+
+  document.getElementById('orders-table').innerHTML = `
+    <thead><tr><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Actions</th></tr></thead>
+    <tbody>
+      ${active.length ? active.map(o=>{
+        const itemsFlat = Object.entries(o.itemsByMeal).map(([meal,arr])=>`<b>${meal}:</b> ${arr.map(i=>i.name+' ×'+i.qty).join(', ')}`).join('<br>');
+        return `<tr>
+          <td>${o.customerName}</td>
+          <td>${itemsFlat}</td>
+          <td class="mono">₹${o.total}</td>
+          <td>
+            <span class="paid-tag ${o.paid?'yes':'no'}">${o.paid ? (o.paymentMethod==='upi'?'Paid · UPI':'Paid · Cash') : 'COD — unpaid'}</span>
+          </td>
+          <td>
+            <div class="row-actions">
+              ${!o.paid ? `<button class="markpaid" data-id="${o.id}">Mark cash received</button>` : ''}
+              <button class="deliver" data-id="${o.id}">Mark delivered</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('') : `<tr><td colspan="5" class="empty-note">No active orders — waiting for customers to place one.</td></tr>`}
+    </tbody>`;
+
+  document.getElementById('history-table').innerHTML = `
+    <thead><tr><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Delivered</th></tr></thead>
+    <tbody>
+      ${delivered.length ? delivered.map(o=>{
+        const itemsFlat = Object.entries(o.itemsByMeal).map(([meal,arr])=>`<b>${meal}:</b> ${arr.map(i=>i.name+' ×'+i.qty).join(', ')}`).join('<br>');
+        return `<tr>
+          <td>${o.customerName}</td>
+          <td>${itemsFlat}</td>
+          <td class="mono">₹${o.total}</td>
+          <td><span class="paid-tag ${o.paid?'yes':'no'}">${o.paid ? (o.paymentMethod==='upi'?'Paid · UPI':'Paid · Cash') : 'Unpaid'}</span></td>
+          <td class="mono">${o.deliveredAt ? new Date(o.deliveredAt).toLocaleString('en-IN',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'}) : '—'}</td>
+        </tr>`;
+      }).join('') : `<tr><td colspan="5" class="empty-note">No delivered orders yet.</td></tr>`}
+    </tbody>`;
+
+  document.querySelectorAll('.deliver').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      try {
+        await fetch(`${API_BASE}/orders/${btn.dataset.id}/deliver`, { method: 'POST' });
+        loadOrders();
+      } catch (err) { console.error('Failed to mark delivered', err); }
+    });
+  });
+  document.querySelectorAll('.markpaid').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      try {
+        await fetch(`${API_BASE}/orders/${btn.dataset.id}/pay`, { method: 'POST' });
+        loadOrders();
+      } catch (err) { console.error('Failed to mark paid', err); }
+    });
+  });
+}
+
+document.getElementById('refresh-btn').addEventListener('click', loadOrders);
+loadOrders();
+setInterval(loadOrders, 20000); // Poll API every 20s
+</script>
+</body>
+</html>

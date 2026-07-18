@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- SEO Tags -->
+<title>Thali Plan — Customer App</title>
+<meta name="description" content="Thali Plan connects you with local kitchens for customized, healthy meals. Order fresh veg and non-veg thalis instantly.">
+<meta name="keywords" content="thali delivery, local kitchen, homemade food, meal plan, healthy diet">
+<meta property="og:title" content="Thali Plan — Customer App">
+<meta property="og:description" content="Customized daily meals delivered from local kitchens.">
+<meta property="og:type" content="website">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#1E1B18; --panel:#28231F; --panel-2:#332C26; --line:#433A32;
+    --turmeric:#D9A441; --curry:#6B8F5C; --chili:#C24A3B; --sky:#8FA6C4;
+    --text:#F1EAE0; --text-dim:#B7ACA0; --text-faint:#8A7E72;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased; }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  header.top{ padding:16px 18px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; position:sticky; top:0; background:var(--bg); z-index:10; }
+  .back-btn{ width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:var(--panel); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; visibility:hidden; color:var(--text); }
+  .back-btn.show{ visibility:visible; }
+  .back-btn svg{ width:17px; height:17px; }
+  .brand{ display:flex; align-items:center; gap:8px; flex:1; min-width:0; }
+  .brand-mark{ width:26px;height:26px; border-radius:50%; border:2px solid var(--turmeric); position:relative; flex-shrink:0; }
+  .brand-mark::before,.brand-mark::after{ content:''; position:absolute; background:var(--line); }
+  .brand-mark::before{ width:1px; height:100%; left:50%; }
+  .brand-mark::after{ width:100%; height:1px; top:50%; }
+  .brand h1{ font-size:16px; margin:0; font-weight:600; white-space:nowrap; }
+  .brand .sep{ color:var(--text-faint); }
+  .brand .uname{ font-size:14px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .header-actions{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
+  .avatar{ width:30px; height:30px; border-radius:50%; object-fit:cover; border:1px solid var(--line); background:var(--panel-2); }
+  .icon-btn{ width:32px; height:32px; border-radius:50%; border:1px solid var(--line); background:var(--panel); color:var(--text-dim); display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:14px; }
+
+  main{ max-width:640px; margin:0 auto; padding:18px 18px 90px; }
+  .screen{ display:none; } .screen.active{ display:block; animation:fadeIn .2s ease; }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+  .panel{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:22px 20px; }
+  .panel h2{ font-family:'Fraunces',serif; font-size:20px; margin:0 0 6px; font-weight:600; }
+  .panel-sub{ font-size:13px; color:var(--text-faint); margin:0 0 20px; line-height:1.5;}
+  .section-label{ font-family:'Fraunces',serif; font-size:15px; margin:22px 0 4px; font-weight:600; }
+  .section-label:first-of-type{ margin-top:0; }
+  .section-hint{ font-size:12px; color:var(--text-faint); margin:0 0 12px; }
+
+  label{ display:block; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-faint); margin-bottom:6px; font-family:'IBM Plex Mono',monospace; }
+  .field{ margin-bottom:15px; }
+  input[type=number], input[type=text], input[type=email], input[type=tel], select, textarea{
+    width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--text);
+    padding:11px 13px; border-radius:8px; font-family:'Inter',sans-serif; font-size:15px;
+  }
+  textarea{ resize:vertical; min-height:64px; font-family:'Inter',sans-serif; }
+  input.error{ border-color:var(--chili); }
+  .error-text{ color:var(--chili); font-size:12px; margin-top:5px; display:none; }
+  .error-text.show{ display:block; }
+  input:focus, select:focus, textarea:focus, button:focus-visible{ outline:2px solid var(--turmeric); outline-offset:1px; }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .row3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+
+  .avatar-upload{ display:flex; align-items:center; gap:14px; margin-bottom:18px; }
+  .avatar-preview{ width:64px; height:64px; border-radius:50%; border:2px solid var(--line); background:var(--panel-2) center/cover no-repeat; display:flex; align-items:center; justify-content:center; font-family:'Fraunces',serif; font-size:22px; color:var(--text-faint); flex-shrink:0; }
+  .avatar-upload-btn{ background:var(--panel-2); border:1px solid var(--line); color:var(--text-dim); padding:8px 14px; border-radius:8px; font-size:12.5px; cursor:pointer; }
+  .avatar-upload input[type=file]{ display:none; }
+  .avatar-error{ color:var(--chili); font-size:11.5px; margin-top:4px; display:none; }
+  .avatar-error.show{ display:block; }
+
+  .badge-veg{ display:inline-flex; align-items:center; gap:6px; font-size:12px; font-family:'IBM Plex Mono',monospace; color:var(--curry); border:1px solid var(--curry); border-radius:999px; padding:5px 12px; margin-bottom:18px; }
+
+  .pattern-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:9px; }
+  .pattern-row span{ font-size:13.5px; flex:1; }
+  .pattern-row select{ width:150px; flex-shrink:0; font-size:13px; padding:9px 10px; }
+
+  .tier-toggle, .diet-toggle{ display:flex; gap:10px; }
+  .tier-card{ flex:1; border:1px solid var(--line); border-radius:10px; padding:12px; cursor:pointer; }
+  .tier-card.active{ border-color:var(--curry); background:rgba(107,143,92,0.12); }
+  .tier-card h3{ margin:0 0 3px; font-size:14px; font-weight:600;}
+  .tier-card p{ margin:0; font-size:11.5px; color:var(--text-faint); }
+
+  button.primary{ width:100%; background:var(--turmeric); color:#1E1B18; border:none; padding:14px; border-radius:9px; font-weight:700; font-size:15px; cursor:pointer; }
+  button.primary:hover{ filter:brightness(1.08); }
+  button.primary:disabled{ opacity:0.5; cursor:not-allowed; }
+  button.ghost{ width:100%; background:transparent; color:var(--text-dim); border:1px solid var(--line); padding:12px; border-radius:9px; font-size:14px; cursor:pointer; margin-top:10px; }
+  .btn-row{ margin-top:20px; }
+
+  .otp-boxes{ display:flex; gap:8px; margin-bottom:8px; }
+  .otp-boxes input{ text-align:center; font-size:20px; font-family:'IBM Plex Mono',monospace; padding:12px 0; }
+  .otp-hint{ background:rgba(217,164,65,0.1); border:1px solid var(--turmeric); border-radius:8px; padding:10px 12px; font-size:12.5px; color:var(--turmeric); margin-bottom:16px; line-height:1.5; }
+
+  .loc-status{ font-size:12.5px; color:var(--text-faint); background:var(--panel-2); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:16px; line-height:1.5; }
+  .loc-status.ok{ color:var(--curry); border-color:var(--curry); }
+
+  .kitchen-card{ border:1px solid var(--line); border-radius:12px; padding:15px 16px; margin-bottom:10px; background:var(--panel-2); cursor:pointer; }
+  .kitchen-card.selected{ border-color:var(--turmeric); background:rgba(217,164,65,0.1); }
+  .kitchen-card.disabled{ opacity:0.5; cursor:not-allowed; }
+  .kitchen-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .kitchen-name{ font-size:15px; font-weight:600; display:flex; align-items:center; gap:7px; }
+  .kitchen-dist{ font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--turmeric); white-space:nowrap; }
+  .kitchen-meta{ font-size:12px; color:var(--text-faint); margin-top:5px; display:flex; gap:10px; flex-wrap:wrap; }
+  .kitchen-type-tag{ font-size:10px; font-family:'IBM Plex Mono',monospace; text-transform:uppercase; border-radius:999px; padding:2px 8px; }
+  .kitchen-type-tag.veg{ color:var(--curry); border:1px solid var(--curry); }
+  .kitchen-type-tag.nonveg{ color:var(--chili); border:1px solid var(--chili); }
+  .kitchen-status{ font-size:10.5px; font-family:'IBM Plex Mono',monospace; margin-top:8px; color:var(--text-faint); }
+
+  .meal-toggle-row{ display:flex; gap:8px; margin-bottom:14px; }
+  .meal-toggle{ flex:1; border:1px solid var(--line); border-radius:10px; padding:11px 8px; cursor:pointer; text-align:center; }
+  .meal-toggle.active{ border-color:var(--turmeric); background:rgba(217,164,65,0.1); }
+  .meal-toggle h4{ margin:0; font-family:'Fraunces',serif; font-size:14px; }
+  .meal-toggle span{ font-size:10px; color:var(--text-faint); font-family:'IBM Plex Mono',monospace; }
+
+  .timing-note{ font-size:12px; color:var(--text-faint); background:var(--panel-2); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:14px; line-height:1.5; }
+  .timing-note b{ color:var(--text); }
+
+  .meal-section{ display:none; } .meal-section.active{ display:block; }
+
+  .item-card{ border:1px solid var(--line); border-radius:11px; padding:13px 14px; margin-bottom:9px; background:var(--panel-2); }
+  .item-card.picked{ border-color:var(--curry); }
+  .item-top{ display:flex; align-items:flex-start; gap:10px; cursor:pointer; }
+  .item-info{ flex:1; min-width:0; }
+  .item-info .name{ font-size:14.5px; font-weight:600; display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
+  .item-info .ingredients{ font-size:11.5px; color:var(--text-faint); margin-top:3px; }
+  .item-info .meta{ font-size:11px; color:var(--text-faint); font-family:'IBM Plex Mono',monospace; margin-top:4px; }
+  .item-price{ font-family:'IBM Plex Mono',monospace; font-size:15px; color:var(--turmeric); font-weight:700; white-space:nowrap; }
+  .best-tag{ font-size:9px; font-family:'IBM Plex Mono',monospace; text-transform:uppercase; color:var(--curry); border:1px solid var(--curry); border-radius:999px; padding:1px 6px; }
+  .item-detail{ display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--line); font-size:12.5px; color:var(--text-dim); line-height:1.6; }
+  .item-detail.open{ display:block; }
+  .item-action{ margin-top:10px; display:flex; justify-content:flex-end; }
+  .add-btn{ background:var(--turmeric); color:#1E1B18; border:none; padding:7px 16px; border-radius:999px; font-weight:700; font-size:12.5px; cursor:pointer; }
+  .qty-stepper{ display:flex; align-items:center; gap:12px; background:var(--panel); border:1px solid var(--curry); border-radius:999px; padding:4px 6px; }
+  .qty-stepper button{ width:26px; height:26px; border-radius:50%; border:none; background:var(--curry); color:#1E1B18; font-weight:700; font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .qty-stepper .qty-num{ font-family:'IBM Plex Mono',monospace; font-size:14px; min-width:16px; text-align:center; }
+
+  .order-bar{ position:fixed; bottom:0; left:0; right:0; background:var(--panel); border-top:1px solid var(--line); padding:13px 18px; display:flex; align-items:center; justify-content:space-between; gap:12px; z-index:10; }
+  .order-bar .totals{ font-size:13px; color:var(--text-dim); }
+  .order-bar .totals b{ color:var(--turmeric); font-family:'IBM Plex Mono',monospace; }
+  .order-bar button{ background:var(--turmeric); color:#1E1B18; border:none; padding:11px 18px; border-radius:8px; font-weight:700; font-size:13.5px; cursor:pointer; white-space:nowrap; }
+
+  .thali-wrap{ display:flex; align-items:center; gap:20px; flex-wrap:wrap; margin-bottom:8px; }
+  .thali-ring{ width:130px; height:130px; flex-shrink:0; }
+  .thali-legend{ display:grid; grid-template-columns:1fr 1fr; gap:7px 16px; flex:1; min-width:180px;}
+  .legend-item{ display:flex; align-items:center; gap:7px; font-size:12px; }
+  .legend-dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .legend-item .pct{ margin-left:auto; font-family:'IBM Plex Mono',monospace; color:var(--text-dim); font-size:11.5px; }
+
+  .insight-box{ border:1px solid var(--line); border-radius:10px; padding:13px 15px; background:var(--panel-2); margin-bottom:16px; }
+  .insight-box h4{ margin:0 0 7px; font-size:11px; font-family:'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:.04em; color:var(--text-faint); }
+  .insight-box ul{ margin:0; padding-left:16px; font-size:12.5px; line-height:1.6; }
+
+  .review-line{ display:flex; align-items:center; gap:10px; padding:11px 0; border-top:1px solid var(--line); }
+  .review-line:first-child{ border-top:none; }
+  .review-line .rl-name{ flex:1; font-size:14px; }
+  .review-line .rl-name .qty-tag{ color:var(--text-faint); font-family:'IBM Plex Mono',monospace; font-size:11.5px; margin-left:4px; }
+  .review-line .rl-price{ font-family:'IBM Plex Mono',monospace; font-size:13.5px; color:var(--text-dim); width:56px; text-align:right; }
+  .remove-btn{ width:26px; height:26px; border-radius:50%; border:1px solid var(--line); background:transparent; color:var(--chili); cursor:pointer; font-size:14px; flex-shrink:0; }
+
+  .summary-total-row{ display:flex; justify-content:space-between; padding:13px 0 0; margin-top:8px; border-top:1px solid var(--line); font-size:15px; font-weight:700; }
+  .summary-total-row b{ color:var(--turmeric); font-family:'IBM Plex Mono',monospace; }
+
+  .pay-options{ display:flex; gap:10px; margin:16px 0; }
+  .pay-option{ flex:1; border:1px solid var(--line); border-radius:10px; padding:14px 12px; cursor:pointer; text-align:center; }
+  .pay-option.active{ border-color:var(--turmeric); background:rgba(217,164,65,0.1); }
+  .pay-option h4{ margin:0 0 3px; font-size:13.5px; }
+  .pay-option p{ margin:0; font-size:11px; color:var(--text-faint); }
+
+  .upi-box{ border:1px solid var(--line); border-radius:10px; padding:16px; background:var(--panel-2); margin-top:14px; text-align:center; }
+  .upi-box p{ font-size:12.5px; color:var(--text-faint); margin:0 0 12px; }
+  .upi-link{ display:inline-block; background:var(--turmeric); color:#1E1B18; text-decoration:none; padding:12px 24px; border-radius:8px; font-weight:700; font-size:14px; }
+  .paid-msg{ display:none; background:rgba(107,143,92,0.15); border:1px solid var(--curry); color:var(--curry); border-radius:8px; padding:10px; font-size:13px; margin-top:12px; }
+  .paid-msg.show{ display:block; }
+
+  .history-card{ border:1px solid var(--line); border-radius:11px; padding:14px 16px; margin-bottom:10px; background:var(--panel-2); }
+  .history-head{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .history-head .hdate{ font-size:12px; color:var(--text-faint); font-family:'IBM Plex Mono',monospace; }
+  .history-status{ font-size:10.5px; font-family:'IBM Plex Mono',monospace; text-transform:uppercase; border-radius:999px; padding:2px 9px; }
+  .history-status.placed{ color:var(--turmeric); border:1px solid var(--turmeric); }
+  .history-status.delivered{ color:var(--curry); border:1px solid var(--curry); }
+  .history-items{ font-size:12.5px; color:var(--text-dim); margin-top:8px; line-height:1.6; }
+
+  .note{ font-size:11.5px; color:var(--text-faint); line-height:1.6; margin-top:16px; padding-top:12px; border-top:1px solid var(--line); }
+  .empty-note{ text-align:center; color:var(--text-faint); font-size:13px; padding:20px; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <button class="back-btn" id="back-btn" aria-label="Go back">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+  </button>
+  <div class="brand">
+    <div class="brand-mark"></div>
+    <h1>Thali Plan</h1>
+    <span class="sep" id="header-sep" style="display:none;">·</span>
+    <span class="uname" id="header-uname"></span>
+  </div>
+  <div class="header-actions" id="header-actions" style="display:none;">
+    <button class="icon-btn" id="history-btn" title="Order history">🕘</button>
+    <img class="avatar" id="header-avatar" style="display:none;">
+  </div>
+</header>
+
+<main>
+
+  <!-- SCREEN 0: CONTACT -->
+  <section class="screen active" id="screen-0">
+    <div class="panel">
+      <h2>Create your account</h2>
+      <p class="panel-sub">We'll send a one-time code to verify it's really you.</p>
+
+      <div class="avatar-upload">
+        <div class="avatar-preview" id="avatar-preview-el">＋</div>
+        <div>
+          <button class="avatar-upload-btn" id="avatar-upload-btn" type="button">Upload profile photo</button>
+          <input type="file" id="avatar-input" accept="image/*">
+          <div class="avatar-error" id="avatar-error">Couldn't read that image — try a JPG/PNG under 1.5MB.</div>
+        </div>
+      </div>
+
+      <div class="field"><label>Full name</label><input type="text" id="su-name" placeholder="Your name"></div>
+      <div class="field">
+        <label>Gmail address</label>
+        <input type="email" id="su-email" placeholder="you@gmail.com">
+        <div class="error-text" id="email-error">Enter a valid Gmail address, e.g. name@gmail.com</div>
+      </div>
+      <div class="field">
+        <label>Mobile number</label>
+        <input type="tel" id="su-mobile" placeholder="10-digit mobile number">
+        <div class="error-text" id="mobile-error">Enter a valid 10-digit mobile number</div>
+      </div>
+      <div class="btn-row"><button class="primary" id="send-otp-btn">Send OTP</button></div>
+    </div>
+  </section>
+
+  <!-- SCREEN 1: OTP -->
+  <section class="screen" id="screen-1">
+    <div class="panel">
+      <h2>Enter the OTP</h2>
+      <p class="panel-sub">Sent to your mobile number and Gmail address.</p>
+      <div class="otp-hint">
+        This is connected to your API. For demo purposes, the code is <b id="demo-otp-display">0000</b>.
+      </div>
+      <div class="otp-boxes">
+        <input type="text" maxlength="1" class="otp-digit">
+        <input type="text" maxlength="1" class="otp-digit">
+        <input type="text" maxlength="1" class="otp-digit">
+        <input type="text" maxlength="1" class="otp-digit">
+      </div>
+      <div class="error-text" id="otp-error">Incorrect OTP — please try again</div>
+      <div class="btn-row"><button class="primary" id="verify-otp-btn">Verify & continue</button></div>
+    </div>
+  </section>
+
+  <!-- SCREEN 2: CHOOSE KITCHEN -->
+  <section class="screen" id="screen-2">
+    <div class="panel">
+      <h2>Choose your kitchen</h2>
+      <p class="panel-sub">Kitchens near you, closest first. More join as the network grows.</p>
+
+      <div class="loc-status" id="loc-status">Finding kitchens near you…</div>
+
+      <div class="section-label" style="margin-top:0;">Your food preference</div>
+      <div class="diet-toggle" id="diet-pref-toggle">
+        <div class="tier-card active" data-diet="veg"><h3>Purely vegetarian</h3><p>Show only veg kitchens</p></div>
+        <div class="tier-card" data-diet="both"><h3>Veg + non-veg</h3><p>Show all kitchens near you</p></div>
+      </div>
+
+      <div class="section-label">Kitchens</div>
+      <div id="kitchen-list"></div>
+
+      <div class="btn-row"><button class="primary" id="to-profile-btn" disabled>Continue with selected kitchen</button></div>
+    </div>
+  </section>
+
+  <!-- SCREEN 3: PROFILE -->
+  <section class="screen" id="screen-3">
+    <div class="panel">
+      <h2>Your details & habits</h2>
+      <p class="panel-sub" id="kitchen-context-line">This kitchen's menu is vegetarian.</p>
+
+      <div class="section-label">Your details</div>
+      <div class="row3">
+        <div class="field"><label>Age</label><input type="number" id="age" value="29"></div>
+        <div class="field"><label>Weight (kg)</label><input type="number" id="weight" value="72"></div>
+        <div class="field"><label>Height (cm)</label><input type="number" id="height" value="170"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Gender</label><select id="gender"><option value="male">Male</option><option value="female">Female</option></select></div>
+        <div class="field"><label>Goal</label><select id="goal"><option value="maintain">Maintain health</option><option value="lose">Weight loss</option><option value="gain">Weight / muscle gain</option></select></div>
+      </div>
+
+      <div class="section-label">Tell us your habits</div>
+      <p class="section-hint">How often do you usually eat these? This helps us fill the gaps.</p>
+      <div id="pattern-questions"></div>
+
+      <div class="field" style="margin-top:14px;">
+        <label>Anything else about your usual diet? (optional)</label>
+        <textarea id="free-text" placeholder="e.g. I mostly eat rice and curd, rarely vegetables"></textarea>
+      </div>
+
+      <div class="section-label">Foods you don't eat</div>
+      <p class="section-hint">Write them in your own words — we can't list every possible dislike as checkboxes.</p>
+      <div class="field"><textarea id="dislike-text" placeholder="e.g. cashew, bitter gourd, very spicy food"></textarea></div>
+
+      <div class="section-label">Known deficiencies (optional)</div>
+      <p class="section-hint">Only tick what a recent test has actually shown.</p>
+      <div class="check-grid" id="deficiency-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;"></div>
+      <div class="field"><label>Other deficiency your test mentioned (optional)</label><textarea id="deficiency-other" placeholder="e.g. Vitamin B9 / folate was low"></textarea></div>
+
+      <div class="section-label">Plan tier</div>
+      <div class="tier-toggle" id="tier-toggle">
+        <div class="tier-card active" data-tier="basic"><h3>Basic</h3><p>Local, low-cost items</p></div>
+        <div class="tier-card" data-tier="premium"><h3>Premium</h3><p>Adds imported / exotic items</p></div>
+      </div>
+
+      <div class="btn-row"><button class="primary" id="to-order-btn">Save & continue</button></div>
+    </div>
+  </section>
+
+  <!-- SCREEN 4: ORDER -->
+  <section class="screen" id="screen-4">
+    <div id="pattern-insight-box"></div>
+    <div class="meal-toggle-row" id="meal-toggle-row">
+      <div class="meal-toggle" data-meal="Breakfast"><h4>Breakfast</h4><span>7:30–9AM</span></div>
+      <div class="meal-toggle" data-meal="Lunch"><h4>Lunch</h4><span>12:30–2PM</span></div>
+      <div class="meal-toggle" data-meal="Dinner"><h4>Dinner</h4><span>7:30–9PM</span></div>
+    </div>
+    <div class="timing-note" id="timing-note"></div>
+    <div class="meal-section" id="section-Breakfast"><div id="items-Breakfast"></div></div>
+    <div class="meal-section" id="section-Lunch"><div id="items-Lunch"></div></div>
+    <div class="meal-section" id="section-Dinner"><div id="items-Dinner"></div></div>
+  </section>
+
+  <!-- SCREEN 5: REVIEW -->
+  <section class="screen" id="screen-5">
+    <div class="panel">
+      <h2>Your order</h2>
+      <p class="panel-sub">Remove or adjust anything before paying.</p>
+      <div class="thali-wrap"><div class="thali-ring" id="review-ring"></div><div class="thali-legend" id="review-legend"></div></div>
+      <div id="review-items"></div>
+      <div class="summary-total-row"><span>Total</span><b id="review-total">₹0</b></div>
+      <div class="btn-row"><button class="primary" id="to-payment-btn">Choose payment method</button></div>
+    </div>
+  </section>
+
+  <!-- SCREEN 6: PAYMENT -->
+  <section class="screen" id="screen-6">
+    <div class="panel">
+      <h2>How would you like to pay?</h2>
+      <p class="panel-sub" id="payment-total-line"></p>
+      <div class="pay-options">
+        <div class="pay-option active" data-method="upi"><h4>UPI</h4><p>Pay now via Google Pay / PhonePe</p></div>
+        <div class="pay-option" data-method="cod"><h4>Cash on Delivery</h4><p>Pay when it arrives</p></div>
+      </div>
+
+      <div id="upi-section">
+        <div class="upi-box">
+          <p>Tap to pay — your usual UPI app will open.</p>
+          <a href="#" class="upi-link" id="upi-pay-link">Pay ₹0 via UPI</a>
+          <div class="paid-msg" id="paid-msg">✓ Payment marked complete</div>
+        </div>
+      </div>
+      <div id="cod-section" style="display:none;">
+        <div class="upi-box">
+          <p>You'll pay cash when the order is delivered. The kitchen will see this order as unpaid until then.</p>
+        </div>
+      </div>
+
+      <div class="btn-row"><button class="primary" id="place-order-btn">Place order</button></div>
+      <p class="note">Nutrient values and prices here are illustrative for this demo, not verified for medical or commercial use. Orders placed here are visible to anyone using the kitchen dashboard for this demo — don't use real personal details.</p>
+    </div>
+  </section>
+
+  <!-- SCREEN 7: HISTORY -->
+  <section class="screen" id="screen-7">
+    <div class="panel">
+      <h2>Your order history</h2>
+      <p class="panel-sub">Everything you've ordered through this app.</p>
+      <div id="history-list"></div>
+    </div>
+  </section>
+
+  <!-- SCREEN 8: CONFIRMATION -->
+  <section class="screen" id="screen-8">
+    <div class="panel" style="text-align:center;">
+      <h2>Order placed 🎉</h2>
+      <p class="panel-sub" id="confirm-message">Your order has been sent to the kitchen.</p>
+      <button class="primary" id="confirm-done-btn">Back to ordering</button>
+    </div>
+  </section>
+
+</main>
+
+<div class="order-bar" id="order-bar" style="display:none;">
+  <div class="totals">Selected: <b id="sel-count">0</b> · <b id="sel-price">₹0</b> · <b id="sel-cal">0</b> kcal</div>
+  <button id="to-review-btn">Review order</button>
+</div>
+
+<script>
+// Replace external storage wrapper with pure localStorage
+async function storageGet(key) {
+  try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : null; }
+  catch(e) { return null; }
+}
+async function storageSet(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+  catch(e) { console.error('Storage error', e); return false; }
+}
+
+const API_BASE = 'http://localhost:3000/api';
+
+const KITCHEN_TEMPLATES = [
+  { id:'home-kitchen', name:'Home Kitchen (near your hostel)', type:'veg', active:true, ratingText:'New partner', offsetLat:0.004, offsetLng:0.003 },
+  { id:'green-leaf', name:'Green Leaf Tiffins', type:'veg', active:false, ratingText:'4.3 ★ · Coming soon', offsetLat:-0.012, offsetLng:0.008 },
+  { id:'annapurna', name:'Annapurna Home Foods', type:'veg', active:false, ratingText:'4.5 ★ · Coming soon', offsetLat:0.018, offsetLng:-0.01 },
+  { id:'spice-route', name:'Spice Route Kitchen', type:'nonveg', active:false, ratingText:'4.1 ★ · Coming soon', offsetLat:-0.007, offsetLng:-0.015 },
+  { id:'coastal-curry', name:'Coastal Curry House', type:'nonveg', active:false, ratingText:'4.4 ★ · Coming soon', offsetLat:0.022, offsetLng:0.019 },
+];
+const DEFAULT_CENTER = { lat:12.9716, lng:77.5946 };
+
+function haversineKm(lat1, lng1, lat2, lng2){
+  const R=6371, toRad=d=>d*Math.PI/180;
+  const dLat=toRad(lat2-lat1), dLng=toRad(lng2-lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)**2;
+  return R * 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+const FOODS_BASIC = [
+  { name:'Ragi dosa (2)', ingredients:['ragi flour','urad dal','curry leaves'], slot:['Breakfast'], price:40, cal:220, protein:6, fat:5, calcium:180, vitD:0, b12:0, iron:2.5, tags:['ragi'], season:null },
+  { name:'Moong dal + rice', ingredients:['moong dal','rice','turmeric','ghee'], slot:['Lunch','Dinner'], price:60, cal:320, protein:14, fat:6, calcium:60, vitD:0, b12:0, iron:3.2, tags:['dal','rice'], season:null },
+  { name:'Paneer bhurji', ingredients:['paneer','onion','tomato','capsicum'], slot:['Breakfast','Lunch','Dinner'], price:70, cal:260, protein:16, fat:18, calcium:300, vitD:0.2, b12:0.3, iron:1.1, tags:['paneer','dairy'], season:null },
+  { name:'Curd (1 cup)', ingredients:['fresh curd'], slot:['Breakfast','Lunch','Dinner'], price:20, cal:100, protein:6, fat:5, calcium:250, vitD:0, b12:0.3, iron:0.1, tags:['dairy'], season:null },
+  { name:'Spinach sabzi', ingredients:['spinach','garlic','onion'], slot:['Lunch','Dinner'], price:45, cal:120, protein:4, fat:6, calcium:150, vitD:0, b12:0, iron:3.6, tags:['spinach'], season:null },
+  { name:'Amla (2 pcs)', ingredients:['fresh amla'], slot:['Breakfast'], price:10, cal:20, protein:0.3, fat:0, calcium:12, vitD:0, b12:0, iron:0.1, tags:['amla'], season:[10,11,12,1,2] },
+  { name:'Milk (1 glass)', ingredients:['toned milk'], slot:['Breakfast','Dinner'], price:25, cal:150, protein:8, fat:8, calcium:280, vitD:2.5, b12:1.1, iron:0.1, tags:['dairy'], season:null },
+  { name:'Sprouts salad', ingredients:['moong sprouts','onion','lemon','coriander'], slot:['Breakfast','Lunch'], price:35, cal:110, protein:8, fat:2, calcium:40, vitD:0, b12:0, iron:2.2, tags:['sprouts'], season:null },
+  { name:'Banana', ingredients:['banana'], slot:['Breakfast'], price:10, cal:105, protein:1.3, fat:0.3, calcium:6, vitD:0, b12:0, iron:0.3, tags:['banana'], season:null },
+  { name:'Fortified cereal bowl', ingredients:['fortified wheat flakes','milk'], slot:['Breakfast'], price:45, cal:180, protein:5, fat:3, calcium:100, vitD:3, b12:1.5, iron:4.0, tags:['cereal'], season:null },
+  { name:'Ragi mudde + sambar', ingredients:['ragi','toor dal','mixed vegetables','tamarind'], slot:['Lunch','Dinner'], price:55, cal:280, protein:9, fat:5, calcium:200, vitD:0, b12:0, iron:2.8, tags:['ragi'], season:null },
+  { name:'Mixed nuts trail', ingredients:['almonds','walnuts','raisins'], slot:['Breakfast','Lunch'], price:50, cal:160, protein:4, fat:14, calcium:40, vitD:0, b12:0, iron:1.0, tags:['nuts','almond'], season:null },
+  { name:'Rajma curry', ingredients:['kidney beans','onion','tomato','garam masala'], slot:['Lunch','Dinner'], price:60, cal:230, protein:12, fat:4, calcium:50, vitD:0, b12:0, iron:3.5, tags:['dal'], season:null },
+  { name:'Mango bowl (seasonal)', ingredients:['fresh mango'], slot:['Breakfast','Lunch'], price:35, cal:90, protein:1, fat:0.5, calcium:15, vitD:0, b12:0, iron:0.3, tags:['mango'], season:[4,5,6,7] },
+  { name:'Jackfruit sabzi (seasonal)', ingredients:['raw jackfruit','coconut','mustard seeds'], slot:['Lunch','Dinner'], price:50, cal:150, protein:3, fat:6, calcium:40, vitD:0, b12:0, iron:1.2, tags:['jackfruit'], season:[3,4,5,6,7] },
+  { name:'Guava (2 pcs, seasonal)', ingredients:['fresh guava'], slot:['Breakfast'], price:20, cal:40, protein:1, fat:0.3, calcium:20, vitD:0, b12:0, iron:0.3, tags:['guava'], season:[10,11,12,1,2] },
+];
+const FOODS_PREMIUM = [
+  { name:'Avocado toast (multigrain)', ingredients:['avocado','multigrain bread','chili flakes'], slot:['Breakfast'], price:150, cal:280, protein:7, fat:16, calcium:40, vitD:0, b12:0, iron:1.8, tags:['avocado'], season:null, prepExtra:30 },
+  { name:'Kiwi + chia bowl', ingredients:['kiwi','chia seeds','honey'], slot:['Breakfast'], price:120, cal:180, protein:5, fat:6, calcium:80, vitD:0, b12:0, iron:1.2, tags:['kiwi'], season:null, prepExtra:20 },
+  { name:'Almond milk latte', ingredients:['almond milk','espresso'], slot:['Breakfast'], price:90, cal:90, protein:2, fat:4, calcium:180, vitD:1, b12:0, iron:0.4, tags:['almond'], season:null, prepExtra:15 },
+  { name:'Quinoa + roasted veg bowl', ingredients:['quinoa','zucchini','bell pepper','olive oil'], slot:['Lunch','Dinner'], price:160, cal:340, protein:12, fat:10, calcium:60, vitD:0, b12:0, iron:3.0, tags:['quinoa'], season:null, prepExtra:30 },
+  { name:'Blueberries (1 bowl)', ingredients:['imported blueberries'], slot:['Breakfast'], price:140, cal:85, protein:1, fat:0.5, calcium:9, vitD:0, b12:0, iron:0.4, tags:['berries'], season:null, prepExtra:15 },
+  { name:'Almonds (10)', ingredients:['almonds'], slot:['Breakfast','Lunch'], price:60, cal:70, protein:2.5, fat:6, calcium:30, vitD:0, b12:0, iron:0.5, tags:['almond','nuts'], season:null, prepExtra:10 },
+];
+
+const DEFICIENCY_OPTIONS = [
+  { key:'calcium', label:'Calcium — low' }, { key:'vitD', label:'Vitamin D — low' },
+  { key:'b12', label:'Vitamin B12 — low' }, { key:'iron', label:'Iron — low' },
+];
+const PATTERN_QUESTIONS = [
+  { key:'greens', label:'Leafy greens (spinach, methi, etc.)', signals:'iron' },
+  { key:'dairy', label:'Dairy (milk, curd, paneer)', signals:'calcium' },
+  { key:'nuts', label:'Nuts & seeds', signals:null },
+  { key:'pulses', label:'Dal / pulses', signals:'iron' },
+  { key:'sun', label:'Time outdoors in sunlight', signals:'vitD' },
+];
+const FREQ_OPTIONS = ['Daily','Few times a week','Rarely','Never'];
+const FREQ_BOOST = { 'Daily':1, 'Few times a week':1, 'Rarely':1.3, 'Never':1.6 };
+const TARGETS_RDA = { calcium: 1000, vitD: 15, b12: 2.4, iron: 11 };
+const NUTRIENTS = [
+  { key:'calcium', label:'Calcium', color:'#D9A441' }, { key:'vitD', label:'Vitamin D', color:'#6B8F5C' },
+  { key:'b12', label:'Vitamin B12', color:'#C24A3B' }, { key:'iron', label:'Iron', color:'#8FA6C4' },
+];
+const LEAD_MINUTES_BASE = 120;
+
+let state = {
+  history:[0], demoOtp:'', account:{ name:'', email:'', mobile:'', avatar:'' },
+  dietPref:'veg', selectedKitchenId:null,
+  profile:{}, dislikeText:'', boostSet:[], tier:'basic', patternInsights:[], targets:null,
+  activeMeal:'Breakfast', selectedItems:{ Breakfast:new Map(), Lunch:new Map(), Dinner:new Map() },
+  paymentMethod:'upi'
+};
+
+function calcTargets(age, weight, height, gender, goal, boostNutrients){
+  let bmr = gender === 'male' ? 10*weight + 6.25*height - 5*age + 5 : 10*weight + 6.25*height - 5*age - 161;
+  let cal = bmr * 1.4;
+  if(goal === 'lose') cal -= 300;
+  if(goal === 'gain') cal += 300;
+  let protein = goal === 'gain' ? weight*1.6 : weight*1.0;
+  const t = { cal: Math.round(cal), protein: Math.round(protein), calcium: TARGETS_RDA.calcium, vitD: TARGETS_RDA.vitD, b12: TARGETS_RDA.b12, iron: TARGETS_RDA.iron };
+  (boostNutrients||[]).forEach(d => { if(t[d.key||d] !== undefined){ const k=d.key||d; const mult=d.mult||1.4; t[k] = Math.round(t[k]*mult); } });
+  return t;
+}
+
+const patternContainer = document.getElementById('pattern-questions');
+PATTERN_QUESTIONS.forEach(q=>{
+  const row = document.createElement('div'); row.className = 'pattern-row';
+  const sel = FREQ_OPTIONS.map(o=>`<option value="${o}">${o}</option>`).join('');
+  row.innerHTML = `<span>${q.label}</span><select id="pattern-${q.key}" data-signals="${q.signals||''}">${sel}</select>`;
+  patternContainer.appendChild(row);
+});
+const deficiencyGrid = document.getElementById('deficiency-grid');
+DEFICIENCY_OPTIONS.forEach(opt=>{
+  const id = 'def-'+opt.key;
+  const div = document.createElement('label'); div.style.cssText='display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer;font-size:13px;color:var(--text-dim);';
+  div.setAttribute('for', id);
+  div.innerHTML = `<input type="checkbox" id="${id}" value="${opt.key}" style="accent-color:var(--turmeric);"><span>${opt.label}</span>`;
+  deficiencyGrid.appendChild(div);
+});
+document.querySelectorAll('#tier-toggle .tier-card').forEach(card=>{
+  card.addEventListener('click', ()=>{
+    document.querySelectorAll('#tier-toggle .tier-card').forEach(c=>c.classList.remove('active'));
+    card.classList.add('active');
+    state.tier = card.dataset.tier;
+    renderMealItems();
+  });
+});
+document.querySelectorAll('.pay-option').forEach(opt=>{
+  opt.addEventListener('click', ()=>{
+    document.querySelectorAll('.pay-option').forEach(o=>o.classList.remove('active'));
+    opt.classList.add('active');
+    state.paymentMethod = opt.dataset.method;
+    document.getElementById('upi-section').style.display = state.paymentMethod==='upi' ? 'block':'none';
+    document.getElementById('cod-section').style.display = state.paymentMethod==='cod' ? 'block':'none';
+  });
+});
+
+document.getElementById('avatar-upload-btn').addEventListener('click', ()=> document.getElementById('avatar-input').click());
+document.getElementById('avatar-input').addEventListener('change', (e)=>{
+  const errBox = document.getElementById('avatar-error');
+  errBox.classList.remove('show');
+  const file = e.target.files[0];
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ errBox.classList.add('show'); return; }
+  if(file.size > 1.5*1024*1024){ errBox.textContent = 'Image too large — please choose one under 1.5MB.'; errBox.classList.add('show'); return; }
+  const reader = new FileReader();
+  reader.onerror = ()=>{ errBox.classList.add('show'); };
+  reader.onload = ()=>{
+    const dataUrl = reader.result;
+    state.account.avatar = dataUrl;
+    const preview = document.getElementById('avatar-preview-el');
+    preview.style.backgroundImage = `url("${dataUrl}")`;
+    preview.textContent = '';
+  };
+  reader.readAsDataURL(file);
+});
+
+const SCREEN_LABELS = {0:'Sign up',1:'Verify OTP',2:'Choose kitchen',3:'Your habits',4:'Order',5:'Review',6:'Payment',7:'History',8:'Confirmation'};
+function showScreen(n){
+  document.querySelectorAll('.screen').forEach((s)=> s.classList.remove('active'));
+  document.getElementById('screen-'+n).classList.add('active');
+  document.getElementById('back-btn').classList.toggle('show', n>0 && n!==8);
+  document.getElementById('order-bar').style.display = (n===4) ? 'flex' : 'none';
+}
+function goForward(n){ state.history.push(n); showScreen(n); }
+document.getElementById('back-btn').addEventListener('click', ()=>{
+  if(state.history.length>1){ state.history.pop(); showScreen(state.history[state.history.length-1]); }
+});
+
+function updateHeaderForLogin(){
+  document.getElementById('header-actions').style.display = 'flex';
+  document.getElementById('header-sep').style.display = 'inline';
+  document.getElementById('header-uname').textContent = state.account.name || '';
+  if(state.account.avatar){
+    const av = document.getElementById('header-avatar');
+    av.src = state.account.avatar; av.style.display = 'block';
+  }
+}
+
+function validGmail(v){ return /^[a-zA-Z0-9](\.?[a-zA-Z0-9_-]){2,}@gmail\.com$/.test(v.trim()); }
+function validMobile(v){ return /^[6-9]\d{9}$/.test(v.trim()); }
+
+document.getElementById('send-otp-btn').addEventListener('click', async ()=>{
+  const name = document.getElementById('su-name').value.trim();
+  const email = document.getElementById('su-email').value;
+  const mobile = document.getElementById('su-mobile').value;
+  const emailOk = validGmail(email);
+  const mobileOk = validMobile(mobile);
+  document.getElementById('su-email').classList.toggle('error', !emailOk);
+  document.getElementById('email-error').classList.toggle('show', !emailOk);
+  document.getElementById('su-mobile').classList.toggle('error', !mobileOk);
+  document.getElementById('mobile-error').classList.toggle('show', !mobileOk);
+  if(!emailOk || !mobileOk) return;
+  state.account.name = name || 'Guest';
+  state.account.email = email;
+  state.account.mobile = mobile;
+
+  // Make API Request for OTP
+  try {
+    await fetch(`${API_BASE}/send-otp`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: mobile })
+    });
+  } catch (err) { console.error('OTP send failed', err); }
+
+  state.demoOtp = String(Math.floor(1000+Math.random()*9000));
+  document.getElementById('demo-otp-display').textContent = state.demoOtp;
+  document.querySelectorAll('.otp-digit').forEach(i=>i.value='');
+  goForward(1);
+  setTimeout(()=>document.querySelector('.otp-digit').focus(), 200);
+});
+
+document.querySelectorAll('.otp-digit').forEach((inp, idx, arr)=>{
+  inp.addEventListener('input', ()=>{
+    inp.value = inp.value.replace(/[^0-9]/g,'');
+    if(inp.value && idx < arr.length-1) arr[idx+1].focus();
+  });
+  inp.addEventListener('keydown', (e)=>{
+    if(e.key==='Backspace' && !inp.value && idx>0) arr[idx-1].focus();
+  });
+});
+
+document.getElementById('verify-otp-btn').addEventListener('click', async ()=>{
+  const entered = Array.from(document.querySelectorAll('.otp-digit')).map(i=>i.value).join('');
+  const ok = entered.length===4 && entered === state.demoOtp;
+  document.getElementById('otp-error').classList.toggle('show', !ok);
+  document.querySelectorAll('.otp-digit').forEach(i=>i.classList.toggle('error', !ok));
+  if(!ok) return;
+  updateHeaderForLogin();
+  await storageSet('tp_account', state.account);
+  loadKitchens();
+  goForward(2);
+});
+
+let kitchenListData = [];
+function buildKitchenList(center){
+  kitchenListData = KITCHEN_TEMPLATES.map(k=>{
+    const lat = center.lat + k.offsetLat, lng = center.lng + k.offsetLng;
+    return { ...k, distanceKm: haversineKm(center.lat, center.lng, lat, lng) };
+  }).sort((a,b)=>a.distanceKm - b.distanceKm);
+}
+function renderKitchenList(){
+  const pref = state.dietPref;
+  const list = document.getElementById('kitchen-list');
+  const filtered = kitchenListData.filter(k => pref==='both' ? true : k.type==='veg');
+  list.innerHTML = filtered.slice(0,5).map(k=>{
+    const selected = state.selectedKitchenId === k.id;
+    return `
+      <div class="kitchen-card ${selected?'selected':''} ${!k.active?'disabled':''}" data-id="${k.id}" data-active="${k.active}">
+        <div class="kitchen-top">
+          <div class="kitchen-name">${k.name} <span class="kitchen-type-tag ${k.type}">${k.type==='veg'?'veg':'non-veg'}</span></div>
+          <div class="kitchen-dist">${k.distanceKm.toFixed(1)} km</div>
+        </div>
+        <div class="kitchen-meta"><span>${k.ratingText}</span></div>
+        ${!k.active ? `<div class="kitchen-status">Not accepting orders yet — will notify you when it joins</div>` : ''}
+      </div>`;
+  }).join('');
+  document.querySelectorAll('.kitchen-card').forEach(card=>{
+    card.addEventListener('click', ()=>{
+      if(card.dataset.active !== 'true') return;
+      state.selectedKitchenId = card.dataset.id;
+      renderKitchenList();
+      document.getElementById('to-profile-btn').disabled = false;
+    });
+  });
+}
+function loadKitchens(){
+  const statusEl = document.getElementById('loc-status');
+  if(!navigator.geolocation){
+    statusEl.textContent = 'Location not supported by this browser — showing kitchens near a default area.';
+    buildKitchenList(DEFAULT_CENTER);
+    renderKitchenList();
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (pos)=>{
+      statusEl.textContent = 'Using your current location.';
+      statusEl.classList.add('ok');
+      buildKitchenList({ lat:pos.coords.latitude, lng:pos.coords.longitude });
+      renderKitchenList();
+    },
+    ()=>{
+      statusEl.textContent = 'Location access denied — showing kitchens near a default area instead.';
+      buildKitchenList(DEFAULT_CENTER);
+      renderKitchenList();
+    },
+    { timeout:8000 }
+  );
+}
+document.querySelectorAll('#diet-pref-toggle .tier-card').forEach(card=>{
+  card.addEventListener('click', ()=>{
+    document.querySelectorAll('#diet-pref-toggle .tier-card').forEach(c=>c.classList.remove('active'));
+    card.classList.add('active');
+    state.dietPref = card.dataset.diet;
+    renderKitchenList();
+  });
+});
+document.getElementById('to-profile-btn').addEventListener('click', ()=>{
+  const kitchen = kitchenListData.find(k=>k.id===state.selectedKitchenId);
+  document.getElementById('kitchen-context-line').textContent = `Ordering from ${kitchen.name} — their menu is ${kitchen.type==='veg'?'vegetarian':'mixed veg & non-veg'}.`;
+  goForward(3);
+});
+
+document.getElementById('to-order-btn').addEventListener('click', async ()=>{
+  const age = +document.getElementById('age').value;
+  const weight = +document.getElementById('weight').value;
+  const height = +document.getElementById('height').value;
+  const gender = document.getElementById('gender').value;
+  const goal = document.getElementById('goal').value;
+  const dislikeText = document.getElementById('dislike-text').value.toLowerCase();
+  const labDeficiencies = Array.from(document.querySelectorAll('#deficiency-grid input:checked')).map(el=>({key:el.value, mult:1.4}));
+  const freeText = document.getElementById('free-text').value.toLowerCase();
+  const otherDeficiency = document.getElementById('deficiency-other').value.trim();
+
+  const patternFlags = [];
+  const patternInsights = [];
+  PATTERN_QUESTIONS.forEach(q=>{
+    const val = document.getElementById('pattern-'+q.key).value;
+    if((val === 'Rarely' || val === 'Never') && q.signals){
+      patternFlags.push({ key:q.signals, mult:FREQ_BOOST[val] });
+      const phrase = val==='Never' ? "You've never really eaten" : 'You rarely eat';
+      patternInsights.push(`${phrase} ${q.label.toLowerCase()} — your plan leans harder on other sources for that.`);
+    }
+  });
+  
+  state.profile = { age, weight, height, gender, goal };
+  state.dislikeText = dislikeText;
+  state.boostSet = [...labDeficiencies, ...patternFlags];
+  state.patternInsights = patternInsights;
+  state.targets = calcTargets(age, weight, height, gender, goal, state.boostSet);
+
+  state.account.profile = state.profile;
+  state.account.dislikeText = dislikeText;
+  state.account.tier = state.tier;
+  state.account.selectedKitchenId = state.selectedKitchenId;
+  state.account.dietPref = state.dietPref;
+  await storageSet('tp_account', state.account);
+
+  renderInsightBox();
+  renderTimingNote();
+  renderMealItems();
+  goForward(4);
+});
+
+function renderInsightBox(){
+  const box = document.getElementById('pattern-insight-box');
+  box.innerHTML = state.patternInsights.length ? `<div class="insight-box"><h4>Based on your answers</h4><ul>${state.patternInsights.map(i=>`<li>${i}</li>`).join('')}</ul></div>` : '';
+}
+
+function renderTimingNote(){
+  const now = new Date();
+  const earliest = new Date(now.getTime() + LEAD_MINUTES_BASE*60000);
+  const earliestPremium = new Date(now.getTime() + (LEAD_MINUTES_BASE+45)*60000);
+  const fmt = d => d.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' });
+  document.getElementById('timing-note').innerHTML =
+    `Orders need at least <b>2 hours</b> lead time (prep + delivery). Earliest delivery if you order now: <b>${fmt(earliest)}</b> for regular items, <b>${fmt(earliestPremium)}</b> for Premium/exotic items (extra prep time).`;
+}
+
+document.querySelectorAll('.meal-toggle').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.meal-toggle').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.meal-section').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('section-'+t.dataset.meal).classList.add('active');
+    state.activeMeal = t.dataset.meal;
+  });
+});
+document.querySelector('.meal-toggle[data-meal="Breakfast"]').classList.add('active');
+document.getElementById('section-Breakfast').classList.add('active');
+
+function currentMonth(){ return new Date().getMonth()+1; }
+function inSeason(item){ return !item.season || item.season.includes(currentMonth()); }
+
+function remainingNutrients(){
+  const rem = { calcium: state.targets.calcium, vitD: state.targets.vitD, b12: state.targets.b12, iron: state.targets.iron, protein: state.targets.protein };
+  Object.values(state.selectedItems).forEach(map=>{
+    map.forEach(({item, qty})=>{
+      rem.calcium -= item.calcium*qty; rem.vitD -= item.vitD*qty; rem.b12 -= item.b12*qty; rem.iron -= item.iron*qty; rem.protein -= item.protein*qty;
+    });
+  });
+  return rem;
+}
+function topGapNutrient(rem){
+  const gaps = {
+    calcium: Math.max(rem.calcium,0)/state.targets.calcium, vitD: Math.max(rem.vitD,0)/state.targets.vitD,
+    b12: Math.max(rem.b12,0)/state.targets.b12, iron: Math.max(rem.iron,0)/state.targets.iron,
+    protein: Math.max(rem.protein,0)/state.targets.protein
+  };
+  return Object.keys(gaps).reduce((a,b)=> gaps[a]>gaps[b]?a:b);
+}
+function scoreItem(f, rem){
+  const topNutrient = topGapNutrient(rem);
+  const supply = f[topNutrient] || 0;
+  return (supply / Math.max(state.targets[topNutrient],1)) / Math.max(f.price,1) * 1000;
+}
+function dislikeMatch(f){
+  if(!state.dislikeText) return false;
+  const phrases = state.dislikeText.split(/[,\n]/).map(s=>s.trim()).filter(Boolean);
+  if(phrases.length===0) return false;
+  const haystack = (f.name+' '+f.ingredients.join(' ')+' '+f.tags.join(' ')).toLowerCase();
+  return phrases.some(p => p.length>1 && haystack.includes(p));
+}
+function poolFor(mealSlot){
+  let pool = [...FOODS_BASIC];
+  if(state.tier === 'premium'){ pool = pool.concat(FOODS_PREMIUM); }
+  pool = pool.filter(f => !dislikeMatch(f));
+  pool = pool.filter(f => f.slot.includes(mealSlot));
+  pool = pool.filter(f => inSeason(f));
+  return pool;
+}
+
+const NUTRIENT_LABELS = { calcium:'calcium', vitD:'Vitamin D', b12:'Vitamin B12', iron:'iron', protein:'protein' };
+
+function renderMealItems(){
+  ['Breakfast','Lunch','Dinner'].forEach(meal=>{
+    const rem = remainingNutrients();
+    const topNutrient = topGapNutrient(rem);
+    let pool = poolFor(meal).map(f=>({ ...f, score: scoreItem(f, rem) }));
+    pool.sort((a,b)=> b.score - a.score);
+    const container = document.getElementById('items-'+meal);
+    container.innerHTML = pool.map((f,idx)=>{
+      const entry = state.selectedItems[meal].get(f.name);
+      const qty = entry ? entry.qty : 0;
+      return `
+        <div class="item-card ${qty>0?'picked':''}" data-meal="${meal}" data-name="${f.name}">
+          <div class="item-top" data-toggle-detail="1">
+            <div class="item-info">
+              <div class="name">${f.name} ${idx===0 ? '<span class="best-tag">top pick</span>':''}</div>
+              <div class="ingredients">Contains: ${f.ingredients.join(', ')}</div>
+              <div class="meta">${f.cal} kcal · P ${f.protein}g · Ca ${f.calcium}mg · D ${f.vitD}mcg · B12 ${f.b12}mcg · Fe ${f.iron}mg</div>
+            </div>
+            <div class="item-price">₹${f.price}</div>
+          </div>
+          <div class="item-detail" id="detail-${meal}-${idx}">
+            ${idx===0 ? `Suggested first because your plan is currently furthest behind on <b>${NUTRIENT_LABELS[topNutrient]}</b>.` : `Price ₹${f.price} for ${f.cal} kcal. Tap "+ Add" to include.`}
+          </div>
+          <div class="item-action">
+            ${qty>0 ? `
+              <div class="qty-stepper">
+                <button class="qty-minus" aria-label="Decrease">−</button>
+                <span class="qty-num">${qty}</span>
+                <button class="qty-plus" aria-label="Increase">+</button>
+              </div>` : `<button class="add-btn">+ Add</button>`}
+          </div>
+        </div>`;
+    }).join('') || '<p class="empty-note">No items match your filters for this meal.</p>';
+  });
+  wireItemButtons();
+  updateOrderBar();
+}
+
+function wireItemButtons(){
+  document.querySelectorAll('.item-card').forEach(card=>{
+    const meal = card.dataset.meal, name = card.dataset.name;
+    const map = state.selectedItems[meal];
+    const addBtn = card.querySelector('.add-btn');
+    const plusBtn = card.querySelector('.qty-plus');
+    const minusBtn = card.querySelector('.qty-minus');
+    const detailToggle = card.querySelector('[data-toggle-detail]');
+    const detailBox = card.querySelector('.item-detail');
+    const pool = poolFor(meal);
+    const item = pool.find(f=>f.name===name);
+    if(detailToggle) detailToggle.addEventListener('click', ()=> detailBox.classList.toggle('open'));
+    if(addBtn) addBtn.addEventListener('click', (e)=>{ e.stopPropagation(); map.set(name, {item, qty:1}); renderMealItems(); });
+    if(plusBtn) plusBtn.addEventListener('click', (e)=>{ e.stopPropagation(); const en=map.get(name); en.qty+=1; renderMealItems(); });
+    if(minusBtn) minusBtn.addEventListener('click', (e)=>{ e.stopPropagation(); const en=map.get(name); en.qty-=1; if(en.qty<=0) map.delete(name); renderMealItems(); });
+  });
+}
+
+function allSelectedFlat(){
+  const flat = [];
+  ['Breakfast','Lunch','Dinner'].forEach(meal=>{
+    state.selectedItems[meal].forEach(({item, qty})=> flat.push({ item, qty, meal }));
+  });
+  return flat;
+}
+function updateOrderBar(){
+  const items = allSelectedFlat();
+  const count = items.reduce((s,i)=>s+i.qty,0);
+  const price = items.reduce((s,i)=>s+i.item.price*i.qty,0);
+  const cal = items.reduce((s,i)=>s+i.item.cal*i.qty,0);
+  document.getElementById('sel-count').textContent = count;
+  document.getElementById('sel-price').textContent = '₹'+price;
+  document.getElementById('sel-cal').textContent = cal;
+}
+document.getElementById('to-review-btn').addEventListener('click', ()=>{ renderReview(); goForward(5); });
+
+function ringSVG(fractions, size){
+  size = size || 130;
+  const cx=size/2, cy=size/2, r=size*0.39, stroke=size*0.11;
+  const circumference = 2*Math.PI*r;
+  let offset = 0, circles = '';
+  fractions.forEach(f=>{
+    const segLen = circumference / fractions.length;
+    const fillLen = segLen * Math.min(Math.max(f.value,0),1) * 0.94;
+    circles += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#3a332c" stroke-width="${stroke}" stroke-dasharray="${segLen*0.94} ${circumference}" stroke-dashoffset="${-offset}" stroke-linecap="round" transform="rotate(-90 ${cx} ${cy})"/>`;
+    circles += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${f.color}" stroke-width="${stroke}" stroke-dasharray="${fillLen} ${circumference}" stroke-dashoffset="${-offset}" stroke-linecap="round" transform="rotate(-90 ${cx} ${cy})"/>`;
+    offset += segLen;
+  });
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${circles}</svg>`;
+}
+
+let lastTotals = null;
+function renderReview(){
+  const items = allSelectedFlat();
+  const totals = { calcium:0, vitD:0, b12:0, iron:0, protein:0, cal:0, price:0 };
+  items.forEach(({item,qty})=>{ totals.calcium+=item.calcium*qty; totals.vitD+=item.vitD*qty; totals.b12+=item.b12*qty; totals.iron+=item.iron*qty; totals.protein+=item.protein*qty; totals.cal+=item.cal*qty; totals.price+=item.price*qty; });
+  lastTotals = totals;
+  const fractions = NUTRIENTS.map(n=>({ ...n, value: totals[n.key]/state.targets[n.key] }));
+  document.getElementById('review-ring').innerHTML = ringSVG(fractions);
+  document.getElementById('review-legend').innerHTML = fractions.map(f=>`<div class="legend-item"><span class="legend-dot" style="background:${f.color}"></span><span>${f.label}</span><span class="pct">${Math.round(f.value*100)}%</span></div>`).join('');
+
+  let html = '';
+  ['Breakfast','Lunch','Dinner'].forEach(meal=>{
+    const map = state.selectedItems[meal];
+    if(map.size===0) return;
+    html += `<h3 style="font-family:'Fraunces',serif;font-size:14px;margin:14px 0 2px;color:var(--text-dim);">${meal}</h3>`;
+    map.forEach(({item,qty}, name)=>{
+      html += `<div class="review-line">
+        <span class="rl-name">${name} <span class="qty-tag">×${qty}</span></span>
+        <span class="rl-price">₹${item.price*qty}</span>
+        <button class="remove-btn" data-meal="${meal}" data-name="${name}">✕</button>
+      </div>`;
+    });
+  });
+  document.getElementById('review-items').innerHTML = html || '<p class="empty-note">No items selected yet.</p>';
+  document.getElementById('review-total').textContent = '₹'+totals.price;
+
+  document.querySelectorAll('.remove-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.selectedItems[btn.dataset.meal].delete(btn.dataset.name);
+      renderReview();
+      renderMealItems();
+    });
+  });
+}
+
+document.getElementById('to-payment-btn').addEventListener('click', ()=>{
+  document.getElementById('payment-total-line').textContent = `Total to pay: ₹${lastTotals.price}`;
+  document.getElementById('upi-pay-link').textContent = 'Pay ₹'+lastTotals.price+' via UPI';
+  document.getElementById('upi-pay-link').href = `upi://pay?pa=thaliplan@upi&pn=ThaliPlan&am=${lastTotals.price}&cu=INR&tn=ThaliPlanOrder`;
+  document.getElementById('paid-msg').classList.remove('show');
+  goForward(6);
+});
+document.getElementById('upi-pay-link').addEventListener('click', ()=>{
+  document.getElementById('paid-msg').classList.add('show');
+});
+
+document.getElementById('place-order-btn').addEventListener('click', async ()=>{
+  const items = allSelectedFlat();
+  if(items.length===0){ alert('Add at least one item before placing an order.'); return; }
+  const orderItemsByMeal = {};
+  items.forEach(({item,qty,meal})=>{
+    if(!orderItemsByMeal[meal]) orderItemsByMeal[meal] = [];
+    orderItemsByMeal[meal].push({ name:item.name, qty, price:item.price });
+  });
+  const kitchen = kitchenListData.find(k=>k.id===state.selectedKitchenId) || {};
+  
+  const order = {
+    id: 'ord_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    customerName: state.account.name || 'Guest',
+    kitchenId: kitchen.id, 
+    kitchenName: kitchen.name,
+    itemsByMeal: orderItemsByMeal,
+    total: lastTotals.price,
+    paymentMethod: state.paymentMethod,
+    paid: state.paymentMethod === 'upi',
+    status: 'placed',
+    placedAt: new Date().toISOString()
+  };
+
+  // SEND TO BACKEND API
+  try {
+    await fetch(`${API_BASE}/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(order)
+    });
+  } catch (err) { console.error('Failed to send order to API', err); }
+
+  const myHistory = (await storageGet('tp_history')) || [];
+  myHistory.unshift(order);
+  await storageSet('tp_history', myHistory);
+
+  state.selectedItems = { Breakfast:new Map(), Lunch:new Map(), Dinner:new Map() };
+
+  document.getElementById('confirm-message').textContent = `Your order (₹${order.total}, ${state.paymentMethod==='upi'?'paid via UPI':'cash on delivery'}) has been sent to ${order.kitchenName}.`;
+  goForward(8);
+});
+
+document.getElementById('confirm-done-btn').addEventListener('click', ()=>{
+  state.history = [4];
+  showScreen(4);
+  renderMealItems();
+});
+
+document.getElementById('history-btn').addEventListener('click', async ()=>{
+  const hist = (await storageGet('tp_history')) || [];
+  const list = document.getElementById('history-list');
+  list.innerHTML = hist.length ? hist.map(o=>{
+    const itemsFlat = Object.entries(o.itemsByMeal).map(([meal, arr])=>`${meal}: ${arr.map(i=>i.name+' ×'+i.qty).join(', ')}`).join(' · ');
+    const d = new Date(o.placedAt);
+    return `<div class="history-card">
+      <div class="history-head">
+        <span class="hdate">${d.toLocaleDateString('en-IN')} ${d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>
+        <span class="history-status ${o.status}">${o.status}</span>
+      </div>
+      <div class="history-items">${o.kitchenName || ''}<br>${itemsFlat}<br>Total: ₹${o.total} · ${o.paymentMethod==='upi' ? 'Paid via UPI' : (o.paid ? 'Paid (cash)':'Cash on delivery — unpaid')}</div>
+    </div>`;
+  }).join('') : '<p class="empty-note">No past orders yet.</p>';
+  goForward(7);
+});
+
+(async function init(){
+  const saved = await storageGet('tp_account');
+  if(saved && saved.name){
+    state.account = saved;
+    updateHeaderForLogin();
+    if(saved.profile){
+      document.getElementById('age').value = saved.profile.age;
+      document.getElementById('weight').value = saved.profile.weight;
+      document.getElementById('height').value = saved.profile.height;
+      document.getElementById('gender').value = saved.profile.gender;
+      document.getElementById('goal').value = saved.profile.goal;
+      document.getElementById('dislike-text').value = saved.dislikeText || '';
+      state.profile = saved.profile;
+      state.dislikeText = saved.dislikeText || '';
+      state.tier = saved.tier || 'basic';
+      state.selectedKitchenId = saved.selectedKitchenId || 'home-kitchen';
+      state.dietPref = saved.dietPref || 'veg';
+      document.querySelectorAll('#tier-toggle .tier-card').forEach(c=>c.classList.toggle('active', c.dataset.tier===state.tier));
+      state.targets = calcTargets(saved.profile.age, saved.profile.weight, saved.profile.height, saved.profile.gender, saved.profile.goal, []);
+      loadKitchens();
+      renderTimingNote();
+      renderMealItems();
+      state.history = [4];
+      showScreen(4);
+      return;
+    }
+    loadKitchens();
+    state.history = [2];
+    showScreen(2);
+  }
+})();
+</script>
+</body>
+</html>
