@@ -1,0 +1,10 @@
+node_modules/
+.env
+google-credentials.json
+*.log
+*.out
+*.err
+tmp_*
+.DS_Store
+dist/
+build/

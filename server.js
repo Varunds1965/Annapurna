@@ -1,109 +1,136 @@
-const { Client } = require('pg');
-
-// Remember to replace 'your_actual_password' with your PostgreSQL password
-const dbClient = new Client({
-  user: 'postgres',
-  password: 'Varun121@',
-  host: 'localhost',
-  port: 5432,
-  database: 'postgres' 
-});
-
-dbClient.connect()
-  .then(() => console.log('Connected to PostgreSQL successfully!'))
-  .catch(err => console.error('Database connection error:', err.stack));
+/**
+ * Thali Plan — Main Server
+ * Express 5 + WebSocket + PostgreSQL
+ */
+require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
-const { Pool } = require('pg');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const http = require('http');
+const path = require('path');
+
+const { pool } = require('./src/db/pool');
+const { errorHandler } = require('./src/middleware/errorHandler');
+const { initWebSocket } = require('./src/services/websocket');
+
+// Route imports
+const ordersRouter = require('./src/routes/orders');
+const kitchensRouter = require('./src/routes/kitchens');
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+const server = http.createServer(app);
 
-// Database connection (Replace with your PostgreSQL credentials)
-const pool = new Pool({
-    user: 'postgres',
-    host: 'localhost',
-    database: 'thaliplan',
-    password: 'Varun121@',
-    port: 5432,
-});
+// ─── Middleware ──────────────────────────────────────────
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(cors({ origin: process.env.CORS_ORIGIN || '*', credentials: true }));
+app.use(morgan('dev'));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
-// 1. Send OTP API
+// ─── Static Files ──────────────────────────────────────
+app.use(express.static(path.join(__dirname, 'public')));
+
+// ─── API Routes ─────────────────────────────────────────
+app.use('/api/orders', ordersRouter);
+app.use('/api/kitchens', kitchensRouter);
+
+// OTP endpoint (stub - integrates with your chosen SMS provider)
 app.post('/api/send-otp', (req, res) => {
-    // In a live app, call Twilio/MSG91 here
-    res.json({ success: true, message: 'OTP Sent via API' });
+  const { phone } = req.body;
+  if (!phone) return res.status(400).json({ error: 'Phone number required' });
+  // In production: integrate with Twilio Verify, MSG91, etc.
+  console.log(`📱 OTP requested for ${phone} — demo mode: OTP is 0000`);
+  res.json({ success: true, message: 'OTP sent (demo: use 0000)' });
 });
 
-// 2. Place Order API
-app.post('/api/orders', async (req, res) => {
-    const { id, customerName, kitchenId, itemsByMeal, total, paymentMethod, paid, status, placedAt } = req.body;
-    try {
-        await pool.query(
-            `INSERT INTO orders (id, customer_name, kitchen_id, items_by_meal, total, payment_method, paid, status, placed_at) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-            [id, customerName, kitchenId, itemsByMeal, total, paymentMethod, paid, status, placedAt]
-        );
-        // Here you would trigger Google Calendar API to block prep time
-        res.json({ success: true, message: 'Order created successfully' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Database error' });
-    }
+// Health check — this one handles its own errors, no asyncHandler needed
+app.get('/api/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ status: 'ok', db: 'connected', uptime: process.uptime() });
+  } catch (_err) {
+    res.status(503).json({ status: 'error', db: 'disconnected' });
+  }
 });
 
-// 3. Get Orders for Kitchen API
-app.get('/api/orders/:kitchenId', async (req, res) => {
-    try {
-        const result = await pool.query(
-            `SELECT * FROM orders WHERE kitchen_id = $1 ORDER BY placed_at DESC`,
-            [req.params.kitchenId]
-        );
-        // Format DB columns to match frontend JSON expectations
-        const formattedOrders = result.rows.map(row => ({
-            id: row.id,
-            customerName: row.customer_name,
-            kitchenId: row.kitchen_id,
-            itemsByMeal: row.items_by_meal,
-            total: parseFloat(row.total),
-            paymentMethod: row.payment_method,
-            paid: row.paid,
-            status: row.status,
-            placedAt: row.placed_at,
-            deliveredAt: row.delivered_at
-        }));
-        res.json(formattedOrders);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Database error' });
-    }
+// Calendar events endpoint (for kitchen dashboard calendar view)
+app.get('/api/calendar/events', async (req, res) => {
+  const { getUpcomingPrepSlots } = require('./src/services/calendar');
+  const fromDate = req.query.from ? new Date(req.query.from) : new Date();
+  const toDate = req.query.to ? new Date(req.query.to) : new Date(Date.now() + 7 * 86400000);
+  const events = await getUpcomingPrepSlots(fromDate, toDate);
+
+  const formatted = events.map(e => ({
+    id: e.id,
+    summary: e.summary,
+    description: e.description,
+    start: e.start?.dateTime || e.start?.date,
+    end: e.end?.dateTime || e.end?.date,
+    colorId: e.colorId,
+  }));
+
+  res.json(formatted);
 });
 
-// 4. Mark Order Delivered API
-app.post('/api/orders/:orderId/deliver', async (req, res) => {
-    try {
-        await pool.query(
-            `UPDATE orders SET status = 'delivered', delivered_at = CURRENT_TIMESTAMP WHERE id = $1`,
-            [req.params.orderId]
-        );
-        res.json({ success: true });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Database error' });
-    }
+// Payment webhook endpoint
+app.post('/api/payments/webhook', async (req, res) => {
+  const { handleWebhook } = require('./src/services/payment');
+  const signature = req.headers['x-webhook-signature'] || req.headers['x-signature'];
+  const result = await handleWebhook(req.body, signature);
+  res.json(result);
 });
 
-// 5. Mark Order Paid API
-app.post('/api/orders/:orderId/pay', async (req, res) => {
-    try {
-        await pool.query(`UPDATE orders SET paid = true WHERE id = $1`, [req.params.orderId]);
-        res.json({ success: true });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Database error' });
-    }
+// ─── SPA fallback ───────────────────────────────────────
+// Express 5 middleware-based catch-all (no wildcard route needed)
+// The static middleware above already serves kitchen.html, admin.html, etc.
+// This catches any remaining GET requests and serves the SPA
+app.use((req, res, next) => {
+  if (req.method === 'GET' && !req.path.startsWith('/api/') && !req.path.includes('.')) {
+    return res.sendFile(path.join(__dirname, 'public', 'customer.html'));
+  }
+  next();
 });
 
-const PORT = 3000;
-app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));
+// ─── Error Handler ─────────────────────────────────────
+app.use(errorHandler);
+
+// ─── Start Server ──────────────────────────────────────
+const PORT = parseInt(process.env.PORT || '3000');
+const HOST = process.env.HOST || '0.0.0.0';
+
+// Initialize WebSocket on the same HTTP server
+initWebSocket(server);
+
+server.listen(PORT, HOST, () => {
+  console.log(`
+╔══════════════════════════════════════════╗
+║           Thali Plan Server              ║
+║──────────────────────────────────────────║
+║  API:      http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/api  ║
+║  Customer: http://localhost:${PORT}                  ║
+║  Kitchen:  http://localhost:${PORT}/kitchen.html     ║
+║  Admin:    http://localhost:${PORT}/admin            ║
+║  WebSocket: ws://localhost:${PORT}/ws                ║
+║──────────────────────────────────────────║
+║  DB:       ${process.env.DB_NAME || 'thaliplan'}                    ║
+║  Node:     ${process.version}                         ║
+╚══════════════════════════════════════════╝
+  `);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
+
+async function gracefulShutdown() {
+  console.log('\n🛑 Shutting down gracefully...');
+  await pool.end();
+  server.close(() => {
+    console.log('✓ Server closed');
+    process.exit(0);
+  });
+}
+
+module.exports = { app, server };

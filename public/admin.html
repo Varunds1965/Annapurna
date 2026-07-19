@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thali Plan — Admin Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#1E1B18;--panel:#28231F;--panel-2:#332C26;--line:#433A32;--turmeric:#D9A441;--curry:#6B8F5C;--chili:#C24A3B;--sky:#8FA6C4;--text:#F1EAE0;--text-dim:#B7ACA0;--text-faint:#8A7E72;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:18px 24px;display:flex;justify-content:space-between;align-items:center;}
+  header h1{font-family:'Fraunces',serif;font-size:20px;margin:0;display:flex;align-items:center;gap:10px;}
+  header span{font-size:12px;color:var(--text-faint);margin-left:8px;}
+  .tabs{display:flex;gap:4px;background:var(--panel-2);border-radius:8px;padding:4px;}
+  .tabs button{background:transparent;border:none;color:var(--text-dim);padding:8px 18px;border-radius:6px;cursor:pointer;font-size:13px;}
+  .tabs button.active{background:var(--turmeric);color:#1E1B18;font-weight:600;}
+  main{max-width:1200px;margin:0 auto;padding:24px;}
+  .tab{display:none;}.tab.active{display:block;}
+  .stat-row{display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap;}
+  .stat{flex:1;min-width:160px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;}
+  .stat .num{font-family:'Fraunces',serif;font-size:30px;color:var(--turmeric);}
+  .stat .lbl{font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;margin-top:2px;}
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:12px;}
+  th{text-align:left;font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);padding:12px 14px;background:var(--panel-2);border-bottom:1px solid var(--line);}
+  td{padding:12px 14px;border-bottom:1px solid var(--line);font-size:13px;}
+  .badge{padding:3px 10px;border-radius:999px;font-size:11px;font-family:'IBM Plex Mono',monospace;display:inline-block;}
+  .badge.veg{color:var(--curry);border:1px solid var(--curry);}
+  .badge.nonveg{color:var(--chili);border:1px solid var(--chili);}
+  .badge.active{background:rgba(107,143,92,0.15);color:var(--curry);}
+  .badge.inactive{background:rgba(194,74,59,0.15);color:var(--chili);}
+  .btn{background:var(--turmeric);color:#1E1B18;border:none;padding:8px 16px;border-radius:6px;font-size:12.5px;font-weight:600;cursor:pointer;}
+  .btn-sm{padding:5px 10px;font-size:11px;background:var(--panel-2);border:1px solid var(--line);color:var(--text-dim);border-radius:4px;cursor:pointer;}
+  form{display:grid;gap:14px;max-width:400px;padding:20px;background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:24px;}
+  label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint);}
+  input,select,textarea{width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:10px 12px;border-radius:6px;font-size:14px;}
+  .empty{color:var(--text-faint);font-size:13px;padding:16px 0;}
+  .flex{display:flex;gap:10px;flex-wrap:wrap;}
+  .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:12px;}
+  .cal-day{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px;min-height:60px;font-size:12px;}
+  .cal-day .num{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--turmeric);margin-bottom:4px;}
+  .cal-event{font-size:10px;background:rgba(217,164,65,0.15);border-left:2px solid var(--turmeric);padding:2px 5px;margin-top:2px;border-radius:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+</style>
+</head>
+<body>
+<header>
+  <h1>🛠 Thali Plan <span>admin</span></h1>
+  <div class="tabs">
+    <button class="active" data-tab="overview">Overview</button>
+    <button data-tab="kitchens">Kitchens</button>
+    <button data-tab="orders">Orders</button>
+    <button data-tab="calendar">Calendar</button>
+    <button data-tab="menu">Menu</button>
+  </div>
+</header>
+<main>
+  <div class="tab active" id="tab-overview">
+    <div class="stat-row" id="overview-stats"></div>
+    <h3 style="font-family:'Fraunces',serif;margin:24px 0 12px;">Recent orders</h3>
+    <table><thead><tr><th>Order</th><th>Customer</th><th>Kitchen</th><th>Total</th><th>Status</th><th>Time</th></tr></thead><tbody id="recent-orders"></tbody></table>
+  </div>
+  <div class="tab" id="tab-kitchens">
+    <div class="flex" style="margin-bottom:16px;">
+      <button class="btn" id="add-kitchen-btn">+ Add kitchen</button>
+    </div>
+    <div id="kitchen-form" style="display:none;">
+      <form id="kitchen-form-el">
+        <label>Kitchen ID (slug) <input type="text" id="k-id" required placeholder="my-kitchen"></label>
+        <label>Name <input type="text" id="k-name" required placeholder="My Kitchen"></label>
+        <label>Type <select id="k-type"><option value="veg">Vegetarian</option><option value="nonveg">Non-Vegetarian</option></select></label>
+        <label>Latitude <input type="number" id="k-lat" step="any" value="12.9716"></label>
+        <label>Longitude <input type="number" id="k-lng" step="any" value="77.5946"></label>
+        <button class="btn" type="submit">Save kitchen</button>
+      </form>
+    </div>
+    <table><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Status</th><th>Rating</th><th>Created</th></tr></thead><tbody id="kitchens-list"></tbody></table>
+  </div>
+  <div class="tab" id="tab-orders">
+    <div class="flex" style="margin-bottom:12px;">
+      <select id="order-filter" style="width:auto;padding:8px;background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:6px;">
+        <option value="">All orders</option>
+        <option value="placed">Placed</option>
+        <option value="confirmed">Confirmed</option>
+        <option value="preparing">Preparing</option>
+        <option value="out_for_delivery">Out for delivery</option>
+        <option value="delivered">Delivered</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+    </div>
+    <table><thead><tr><th>Order ID</th><th>Customer</th><th>Kitchen</th><th>Total</th><th>Payment</th><th>Status</th><th>Placed</th></tr></thead><tbody id="all-orders"></tbody></table>
+  </div>
+  <div class="tab" id="tab-calendar">
+    <h3 style="font-family:'Fraunces',serif;margin:0 0 4px;">Prep schedule</h3>
+    <p style="color:var(--text-faint);font-size:13px;">Calendar events are created on your Google Calendar when orders are placed.</p>
+    <div class="calendar-grid" id="calendar-grid"></div>
+  </div>
+  <div class="tab" id="tab-menu">
+    <table><thead><tr><th>Name</th><th>Kitchen</th><th>Tier</th><th>Slots</th><th>Price</th><th>Cal</th></tr></thead><tbody id="menu-list"></tbody></table>
+  </div>
+</main>
+<script>
+const API = 'http://localhost:3000/api';
+
+async function fetchJSON(url, opts={}) {
+  const res = await fetch(url, { headers:{'Content-Type':'application/json'}, ...opts });
+  return res.json();
+}
+
+async function loadOverview() {
+  const [orders, kitchens] = await Promise.all([
+    fetchJSON(`${API}/orders/home-kitchen`),
+    fetchJSON(`${API}/kitchens`)
+  ]);
+  const active = orders.filter(o=>o.status!=='delivered'&&o.status!=='cancelled');
+  const totalRev = orders.reduce((s,o)=>s+(o.paid?parseFloat(o.total):0),0);
+  document.getElementById('overview-stats').innerHTML = `
+    <div class="stat"><div class="num">${orders.length}</div><div class="lbl">Total orders</div></div>
+    <div class="stat"><div class="num">${active.length}</div><div class="lbl">Active orders</div></div>
+    <div class="stat"><div class="num">${kitchens.length}</div><div class="lbl">Kitchens</div></div>
+    <div class="stat"><div class="num">₹${totalRev}</div><div class="lbl">Revenue (paid)</div></div>
+  `;
+  document.getElementById('recent-orders').innerHTML = orders.slice(0,15).map(o=>`
+    <tr>
+      <td class="mono">${o.id.slice(-8)}</td>
+      <td>${o.customerName}</td>
+      <td>${o.kitchenId}</td>
+      <td class="mono">₹${o.total}</td>
+      <td><span class="badge ${o.status}">${o.status}</span></td>
+      <td class="mono">${new Date(o.placedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="6" class="empty">No orders yet</td></tr>';
+}
+
+async function loadKitchens() {
+  const kitchens = await fetchJSON(`${API}/kitchens`);
+  document.getElementById('kitchens-list').innerHTML = kitchens.map(k=>`
+    <tr>
+      <td class="mono">${k.id}</td>
+      <td>${k.name}</td>
+      <td><span class="badge ${k.type}">${k.type}</span></td>
+      <td><span class="badge ${k.active?'active':'inactive'}">${k.active?'Active':'Inactive'}</span></td>
+      <td>${k.ratingText}</td>
+      <td class="mono">${k.createdAt?new Date(k.createdAt).toLocaleDateString('en-IN'):'—'}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="6" class="empty">No kitchens registered</td></tr>';
+}
+
+async function loadOrders() {
+  const status = document.getElementById('order-filter').value;
+  const url = status ? `${API}/orders/home-kitchen?status=${status}` : `${API}/orders/home-kitchen`;
+  const orders = await fetchJSON(url);
+  document.getElementById('all-orders').innerHTML = orders.map(o=>`
+    <tr>
+      <td class="mono">${o.id.slice(-10)}</td>
+      <td>${o.customerName}</td>
+      <td>${o.kitchenId}</td>
+      <td class="mono">₹${o.total}</td>
+      <td>${o.paid?'✅ '+o.paymentMethod:'⏳ '+o.paymentMethod}</td>
+      <td><span class="badge" style="background:rgba(217,164,65,0.1);border:1px solid var(--turmeric);">${o.status}</span></td>
+      <td class="mono">${new Date(o.placedAt).toLocaleDateString('en-IN')}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="7" class="empty">No orders found</td></tr>';
+}
+
+async function loadMenu() {
+  const items = await fetchJSON(`${API}/kitchens/home-kitchen/menu`);
+  document.getElementById('menu-list').innerHTML = items.map(i=>`
+    <tr>
+      <td>${i.name}</td>
+      <td>home-kitchen</td>
+      <td><span class="badge" style="${i.tier==='premium'?'color:var(--turmeric);border-color:var(--turmeric);':'color:var(--text-faint);border-color:var(--line);'}">${i.tier}</span></td>
+      <td>${(i.slots||[]).join(', ')}</td>
+      <td class="mono">₹${i.price}</td>
+      <td>${i.cal}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="6" class="empty">No menu items</td></tr>';
+}
+
+document.getElementById('add-kitchen-btn').addEventListener('click',()=>{
+  document.getElementById('kitchen-form').style.display = document.getElementById('kitchen-form').style.display==='none'?'block':'none';
+});
+document.getElementById('kitchen-form-el').addEventListener('submit',async(e)=>{
+  e.preventDefault();
+  await fetchJSON(`${API}/kitchens`,{
+    method:'POST',
+    body: JSON.stringify({
+      id: document.getElementById('k-id').value,
+      name: document.getElementById('k-name').value,
+      type: document.getElementById('k-type').value,
+      active: true,
+      lat: parseFloat(document.getElementById('k-lat').value),
+      lng: parseFloat(document.getElementById('k-lng').value),
+    })
+  });
+  document.getElementById('kitchen-form').style.display='none';
+  loadKitchens();
+});
+document.getElementById('order-filter').addEventListener('change', loadOrders);
+document.querySelectorAll('.tabs button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    document.getElementById('tab-'+b.dataset.tab).classList.add('active');
+    if(b.dataset.tab==='overview') loadOverview();
+    if(b.dataset.tab==='kitchens') loadKitchens();
+    if(b.dataset.tab==='orders') loadOrders();
+    if(b.dataset.tab==='menu') loadMenu();
+  });
+});
+loadOverview();loadKitchens();loadOrders();loadMenu();
+setInterval(loadOverview,15000);
+</script>
+</body>
+</html>

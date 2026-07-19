@@ -1,0 +1,54 @@
+image: node:20
+
+stages:
+  - test
+  - build
+  - deploy
+
+variables:
+  DOCKER_IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - node_modules/
+
+test:
+  stage: test
+  script:
+    - npm ci
+    - echo "Node modules installed successfully"
+    - npm ls --depth=0
+  only:
+    - main
+    - develop
+
+build:
+  stage: build
+  image: docker:24
+  services:
+    - docker:24-dind
+  script:
+    - docker build -t $DOCKER_IMAGE .
+    - docker tag $DOCKER_IMAGE $CI_REGISTRY_IMAGE:latest
+    - docker push $DOCKER_IMAGE
+    - docker push $CI_REGISTRY_IMAGE:latest
+  only:
+    - main
+
+deploy:
+  stage: deploy
+  script:
+    - echo "Deploying Thali Plan..."
+    - echo "  Customer app: / (SPA)"
+    - echo "  Kitchen dashboard: /kitchen.html"
+    - echo "  Admin dashboard: /admin.html"
+    - echo "  API: /api/"
+    - echo "  WebSocket: /ws"
+    - echo ""
+    - echo "To deploy via docker-compose on your server:"
+    - echo "  1. Copy .env with production values"
+    - echo "  2. Copy google-credentials.json"
+    - echo "  3. Run: docker-compose up -d"
+  only:
+    - main

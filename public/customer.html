@@ -951,6 +951,8 @@ document.getElementById('place-order-btn').addEventListener('click', async ()=>{
   const order = {
     id: 'ord_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
     customerName: state.account.name || 'Guest',
+    customerEmail: state.account.email || '',
+    customerMobile: state.account.mobile || '',
     kitchenId: kitchen.id, 
     kitchenName: kitchen.name,
     itemsByMeal: orderItemsByMeal,
