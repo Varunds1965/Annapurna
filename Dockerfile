@@ -1,20 +1,26 @@
+# ── Thali Plan — production image ──
 FROM node:20-alpine
 
+ENV NODE_ENV=production
 WORKDIR /app
 
-# Install dependencies first (for better caching)
+# Install dependencies first (better layer caching)
 COPY package*.json ./
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Copy application code
-COPY . .
+COPY server.js ./
+COPY src ./src
+COPY public ./public
+COPY scripts ./scripts
 
-# Expose ports
+# Writable uploads dir owned by the unprivileged node user
+RUN mkdir -p uploads && chown -R node:node /app
+USER node
+
 EXPOSE 3000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
-# Run
 CMD ["node", "server.js"]
