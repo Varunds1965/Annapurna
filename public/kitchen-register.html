@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Register Your Kitchen — Thali Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream:       #FFF8F0;
+    --sand:        #F0E6D6;
+    --earth:       #5B4636;
+    --sage-light:  #E8F0E4;
+    --sage:        #8FA88D;
+    --olive:       #6B8F5C;
+    --olive-dark:  #4D7A3E;
+    --terracotta:  #D4744A;
+    --saffron:     #E8A838;
+    --leaf:        #3A7D44;
+    --text:        #3D2B1F;
+    --text-dim:    #7A6553;
+    --text-faint:  #A8927A;
+    --card-bg:     #FFFFFF;
+    --card-border: #E8E0D6;
+    --shadow:      0 4px 20px rgba(91, 70, 54, 0.08);
+    --shadow-hover: 0 8px 32px rgba(91, 70, 54, 0.14);
+    --radius:      16px;
+    --radius-sm:   12px;
+    --radius-xs:   8px;
+    --font-serif:  'Playfair Display', serif;
+    --font-sans:   'Inter', sans-serif;
+    --font-mono:   'IBM Plex Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--cream);
+    color: var(--text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background:
+      radial-gradient(ellipse at 10% 20%, rgba(143, 168, 141, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 90% 80%, rgba(212, 116, 74, 0.05) 0%, transparent 50%),
+      var(--cream);
+  }
+  .mono { font-family: var(--font-mono); }
+  .container {
+    width: 100%;
+    max-width: 480px;
+    padding: 20px;
+    position: relative;
+    z-index: 1;
+  }
+  .brand { text-align: center; margin-bottom: 28px; }
+  .brand-icon {
+    width: 56px; height: 56px;
+    background: linear-gradient(135deg, var(--olive), var(--leaf));
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    box-shadow: 0 4px 16px rgba(107, 143, 92, 0.2);
+    margin-bottom: 8px;
+  }
+  .brand h1 {
+    font-family: var(--font-serif);
+    font-size: 26px;
+    margin: 8px 0 4px;
+    color: var(--earth);
+    font-weight: 700;
+  }
+  .brand p { font-size: 13px; color: var(--text-dim); margin: 0; line-height: 1.4; }
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    box-shadow: var(--shadow);
+  }
+  .card h2 {
+    font-family: var(--font-serif);
+    font-size: 20px;
+    margin: 0 0 4px;
+    color: var(--earth);
+    font-weight: 700;
+  }
+  .card .sub {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin: 0 0 22px;
+    line-height: 1.5;
+  }
+  .field { margin-bottom: 16px; }
+  label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-faint);
+    margin-bottom: 6px;
+    font-family: var(--font-mono);
+  }
+  input, select, textarea {
+    width: 100%;
+    background: var(--sand);
+    border: 1px solid var(--card-border);
+    color: var(--text);
+    padding: 12px 14px;
+    border-radius: var(--radius-xs);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  input:focus, select:focus {
+    outline: none;
+    border-color: var(--sage);
+    box-shadow: 0 0 0 3px rgba(107, 143, 92, 0.12);
+  }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .type-toggle { display: flex; gap: 10px; margin-bottom: 0; }
+  .type-option {
+    flex: 1;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+    background: var(--card-bg);
+  }
+  .type-option:hover { border-color: var(--sage); transform: translateY(-1px); box-shadow: var(--shadow); }
+  .type-option.active { border-color: var(--olive); background: rgba(107, 143, 92, 0.06); box-shadow: 0 0 0 2px rgba(107, 143, 92, 0.2); }
+  .type-option h4 { margin: 0 0 3px; font-size: 14px; color: var(--earth); }
+  .type-option p { margin: 0; font-size: 11px; color: var(--text-faint); }
+  button.primary {
+    width: 100%;
+    background: linear-gradient(135deg, var(--terracotta), #E8925E);
+    color: white;
+    border: none;
+    padding: 14px;
+    border-radius: var(--radius-sm);
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: all 0.25s;
+    box-shadow: 0 4px 16px rgba(212, 116, 74, 0.25);
+  }
+  button.primary:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(212, 116, 74, 0.35); }
+  button.primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+  .error-text { color: var(--terracotta); font-size: 12px; margin-top: 5px; display: none; }
+  .error-text.show { display: block; }
+  .success-msg {
+    display: none;
+    background: rgba(107, 143, 92, 0.06);
+    border: 1px solid var(--olive);
+    color: var(--olive-dark);
+    border-radius: var(--radius-xs);
+    padding: 14px;
+    font-size: 13px;
+    margin-top: 16px;
+    line-height: 1.6;
+    font-weight: 500;
+  }
+  .success-msg.show { display: block; }
+  .login-link { text-align: center; margin-top: 18px; font-size: 13px; color: var(--text-dim); }
+  .login-link a { color: var(--terracotta); text-decoration: none; font-weight: 600; }
+  .login-link a:hover { text-decoration: underline; color: var(--saffron); }
+  .spinner {
+    display: none;
+    width: 20px; height: 20px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+    margin: 0 auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading .spinner { display: block; }
+  .loading .btn-text { display: none; }
+  @media (max-width: 480px) { .container { padding: 14px; } .card { padding: 20px 18px; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="brand">
+    <div class="brand-icon">🌿</div>
+    <h1>Thali Plan</h1>
+    <p>Partner with us — add your kitchen and start receiving orders</p>
+  </div>
+  <div class="card">
+    <h2>Register your kitchen</h2>
+    <p class="sub">Fill in your details to get started. We'll review and activate your kitchen within 24 hours.</p>
+    <div class="field">
+      <label>Kitchen / Restaurant name</label>
+      <input type="text" id="k-name" placeholder="e.g. Green Leaf Tiffins" required>
+    </div>
+    <div class="field">
+      <label>Email address</label>
+      <input type="email" id="k-email" placeholder="kitchen@example.com" required>
+      <div class="error-text" id="email-error">Please enter a valid email address</div>
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="k-password" placeholder="At least 6 characters" required minlength="6">
+    </div>
+    <div class="field">
+      <label>Phone number</label>
+      <input type="tel" id="k-phone" placeholder="10-digit mobile number">
+    </div>
+    <div class="field">
+      <label>Kitchen type</label>
+      <div class="type-toggle" id="type-toggle">
+        <div class="type-option active" data-type="veg">
+          <h4>🌿 Vegetarian</h4>
+          <p>Only veg items</p>
+        </div>
+        <div class="type-option" data-type="nonveg">
+          <h4>🍗 Non-Vegetarian</h4>
+          <p>Veg + non-veg items</p>
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Address</label>
+      <textarea id="k-address" placeholder="Your kitchen address" rows="2"></textarea>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Opening time</label>
+        <input type="time" id="k-opening" value="07:00">
+      </div>
+      <div class="field">
+        <label>Closing time</label>
+        <input type="time" id="k-closing" value="22:00">
+      </div>
+    </div>
+    <div class="error-text" id="form-error">Please fill in all required fields</div>
+    <div class="success-msg" id="success-msg">
+      ✅ Registration submitted!<br>
+      Your kitchen is now pending admin approval. You'll receive an email once activated.<br>
+      <strong>Your token is ready — you can now log in to the kitchen dashboard.</strong>
+    </div>
+    <button class="primary" id="register-btn">
+      <span class="btn-text">Register kitchen</span>
+      <div class="spinner"></div>
+    </button>
+    <div class="login-link">
+      Already registered? <a href="/kitchen.html">Log in to your dashboard</a>
+    </div>
+  </div>
+</div>
+<script>
+const API_BASE = window.location.origin + '/api';
+let selectedType = 'veg';
+document.querySelectorAll('.type-option').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('.type-option').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+    selectedType = opt.dataset.type;
+  });
+});
+document.getElementById('register-btn').addEventListener('click', async () => {
+  const name = document.getElementById('k-name').value.trim();
+  const email = document.getElementById('k-email').value.trim();
+  const password = document.getElementById('k-password').value;
+  const phone = document.getElementById('k-phone').value.trim();
+  const address = document.getElementById('k-address').value.trim();
+  const openingTime = document.getElementById('k-opening').value;
+  const closingTime = document.getElementById('k-closing').value;
+  const errorEl = document.getElementById('form-error');
+  const successEl = document.getElementById('success-msg');
+  const btn = document.getElementById('register-btn');
+  errorEl.classList.remove('show');
+  successEl.classList.remove('show');
+  if (!name || !email || !password) {
+    errorEl.textContent = 'Name, email, and password are required';
+    errorEl.classList.add('show');
+    return;
+  }
+  if (password.length < 6) {
+    errorEl.textContent = 'Password must be at least 6 characters';
+    errorEl.classList.add('show');
+    return;
+  }
+  if (!email.includes('@')) {
+    document.getElementById('email-error').classList.add('show');
+    return;
+  }
+  document.getElementById('email-error').classList.remove('show');
+  btn.classList.add('loading');
+  btn.disabled = true;
+  try {
+    const res = await fetch(API_BASE + '/kitchens/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password, phone, type: selectedType, address, openingTime, closingTime }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      localStorage.setItem('tp_kitchen_token', data.token);
+      localStorage.setItem('tp_kitchen', JSON.stringify(data.kitchen));
+      successEl.classList.add('show');
+      btn.style.display = 'none';
+      setTimeout(() => { window.location.href = '/kitchen.html'; }, 2000);
+    } else {
+      errorEl.textContent = data.error || 'Registration failed';
+      errorEl.classList.add('show');
+    }
+  } catch (err) {
+    errorEl.textContent = 'Network error — please try again';
+    errorEl.classList.add('show');
+  } finally {
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

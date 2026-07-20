@@ -1,114 +1,438 @@
 /**
- * Kitchens API — list, get, create kitchens and their menu items
+ * Kitchens API — Registration, Menu Management, Profile
+ * Restaurant self-service portal for adding/managing their own foods
  */
 const { Router } = require('express');
+const bcrypt = require('bcryptjs');
 const { pool } = require('../db/pool');
 const { asyncHandler } = require('../middleware/errorHandler');
+const { authenticate, authorize, generateToken } = require('../middleware/auth');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const { v4: uuidv4 } = require('uuid');
 
 const router = Router();
 
-// LIST KITCHENS
-router.get('/', asyncHandler(async (req, res) => {
-  const result = await pool.query(
-    `SELECT id, name, type, active, rating_text, lat, lng, created_at FROM kitchens ORDER BY active DESC, name ASC`
-  );
+// Multer setup for food photo uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = process.env.UPLOAD_DIR || 'uploads';
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `food_${Date.now()}_${uuidv4().slice(0, 8)}${ext}`);
+  },
+});
 
-  const kitchens = result.rows.map(k => ({
-    id: k.id,
-    name: k.name,
-    type: k.type,
-    active: k.active,
-    ratingText: k.rating_text,
-    lat: k.lat,
-    lng: k.lng,
-  }));
+const upload = multer({
+  storage,
+  limits: { fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only JPG, PNG, WebP, and GIF images are allowed'), false);
+    }
+  },
+});
 
-  res.json(kitchens);
-}));
+/**
+ * POST /api/kitchens/register
+ * Register a new kitchen/restaurant
+ */
+router.post('/register', asyncHandler(async (req, res) => {
+  const { name, email, password, phone, type, lat, lng, address, openingTime, closingTime } = req.body;
 
-// GET KITCHEN DETAILS
-router.get('/:kitchenId', asyncHandler(async (req, res) => {
-  const { kitchenId } = req.params;
-  const result = await pool.query(
-    `SELECT id, name, type, active, rating_text, lat, lng, created_at FROM kitchens WHERE id = $1`,
-    [kitchenId]
-  );
-
-  if (result.rows.length === 0) {
-    return res.status(404).json({ error: 'Kitchen not found' });
+  if (!name || !email || !password || !type) {
+    return res.status(400).json({ error: 'Name, email, password, and type (veg/nonveg) are required' });
   }
 
-  const k = result.rows[0];
-  res.json({
-    id: k.id,
-    name: k.name,
-    type: k.type,
-    active: k.active,
-    ratingText: k.rating_text,
-    lat: k.lat,
-    lng: k.lng,
+  if (!['veg', 'nonveg'].includes(type)) {
+    return res.status(400).json({ error: 'Type must be "veg" or "nonveg"' });
+  }
+
+  // Check if email already exists
+  const existing = await pool.query('SELECT id FROM kitchens WHERE email = $1', [email]);
+  if (existing.rows.length > 0) {
+    return res.status(409).json({ error: 'A kitchen with this email already exists' });
+  }
+
+  // Generate kitchen ID from name
+  const kitchenId = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '_' + uuidv4().slice(0, 6);
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  await pool.query(
+    `INSERT INTO kitchens (id, name, email, password, phone, type, active, lat, lng, address, opening_time, closing_time, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())`,
+    [kitchenId, name, email, hashedPassword, phone || null, type, false, lat || null, lng || null, address || null, openingTime || '07:00', closingTime || '22:00']
+  );
+
+  // Generate JWT
+  const token = generateToken({
+    id: kitchenId,
+    name,
+    email,
+    role: 'kitchen',
+    kitchenId,
+  });
+
+  res.status(201).json({
+    success: true,
+    message: 'Kitchen registered successfully. Awaiting admin approval.',
+    token,
+    kitchen: { id: kitchenId, name, email, type, active: false },
   });
 }));
 
-// GET MENU ITEMS FOR A KITCHEN
-router.get('/:kitchenId/menu', asyncHandler(async (req, res) => {
-  const { kitchenId } = req.params;
+/**
+ * GET /api/kitchens
+ * List all active kitchens (for customer app)
+ */
+router.get('/', asyncHandler(async (req, res) => {
+  const { type, lat, lng } = req.query;
+
+  let query = 'SELECT id, name, type, active, rating_text, lat, lng, address, photo_url, opening_time, closing_time FROM kitchens WHERE active = true';
+  const params = [];
+
+  if (type && ['veg', 'nonveg'].includes(type)) {
+    query += ' AND type = $' + (params.length + 1);
+    params.push(type);
+  }
+
+  query += ' ORDER BY name ASC';
+
+  const result = await pool.query(query, params);
+  res.json(result.rows);
+}));
+
+/**
+ * GET /api/kitchens/:id
+ * Get kitchen details with menu
+ */
+router.get('/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const kitchenResult = await pool.query(
+    'SELECT id, name, type, active, rating_text, lat, lng, address, photo_url, opening_time, closing_time FROM kitchens WHERE id = $1',
+    [id]
+  );
+
+  if (kitchenResult.rows.length === 0) {
+    return res.status(404).json({ error: 'Kitchen not found' });
+  }
+
+  const menuResult = await pool.query(
+    'SELECT * FROM menu_items WHERE kitchen_id = $1 AND active = true ORDER BY tier, name',
+    [id]
+  );
+
+  res.json({
+    ...kitchenResult.rows[0],
+    menu: menuResult.rows,
+  });
+}));
+
+/**
+ * GET /api/kitchens/:id/menu
+ * Get kitchen's menu items
+ */
+router.get('/:id/menu', asyncHandler(async (req, res) => {
+  const { id } = req.params;
   const { tier, slot } = req.query;
 
-  let query = `SELECT * FROM menu_items WHERE kitchen_id = $1 AND active = true`;
-  const params = [kitchenId];
+  let query = 'SELECT * FROM menu_items WHERE kitchen_id = $1 AND active = true';
+  const params = [id];
 
   if (tier) {
-    query += ` AND tier = $${params.length + 1}`;
+    query += ' AND tier = $' + (params.length + 1);
     params.push(tier);
   }
-  if (slot) {
-    query += ` AND $${params.length + 1} = ANY(slots)`;
-    params.push(slot);
-  }
-
-  query += ` ORDER BY tier ASC, price ASC`;
 
   const result = await pool.query(query, params);
 
-  const items = result.rows.map(item => ({
-    id: item.id,
-    name: item.name,
-    ingredients: item.ingredients,
-    slots: item.slots,
-    price: parseFloat(item.price),
-    cal: parseFloat(item.cal),
-    protein: parseFloat(item.protein),
-    fat: parseFloat(item.fat),
-    calcium: parseFloat(item.calcium),
-    vd: parseFloat(item.vd),
-    b12: parseFloat(item.b12),
-    iron: parseFloat(item.iron),
-    tags: item.tags,
-    season: item.season,
-    prepExtra: item.prep_extra_min,
-    tier: item.tier,
-  }));
+  // Filter by meal slot if specified
+  let items = result.rows;
+  if (slot) {
+    items = items.filter(item => item.slots && item.slots.includes(slot));
+  }
 
   res.json(items);
 }));
 
-// ADD KITCHEN (admin)
-router.post('/', asyncHandler(async (req, res) => {
-  const { id, name, type, active, ratingText, lat, lng } = req.body;
+/**
+ * POST /api/kitchens/:id/menu
+ * Add a menu item (kitchen owner only)
+ */
+router.post('/:id/menu', authenticate, authorize('kitchen', 'admin'), asyncHandler(async (req, res) => {
+  const { id } = req.params;
 
-  if (!id || !name || !type) {
-    return res.status(400).json({ error: 'id, name, and type are required' });
+  // Kitchen can only edit their own menu
+  if (req.user.role === 'kitchen' && req.user.kitchenId !== id) {
+    return res.status(403).json({ error: 'You can only add items to your own kitchen' });
   }
 
-  await pool.query(
-    `INSERT INTO kitchens (id, name, type, active, rating_text, lat, lng)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     ON CONFLICT (id) DO UPDATE SET name = $2, type = $3, active = $4, rating_text = $5, lat = $6, lng = $7`,
-    [id, name, type, active || false, ratingText || 'New partner', lat || null, lng || null]
+  const { name, description, ingredients, slots, price, cal, protein, fat, calcium, vd, b12, iron, tags, season, prepExtraMin, tier, availableFrom, availableTo } = req.body;
+
+  if (!name || !price) {
+    return res.status(400).json({ error: 'Name and price are required' });
+  }
+
+  const result = await pool.query(
+    `INSERT INTO menu_items (kitchen_id, name, description, ingredients, slots, price, cal, protein, fat, calcium, vd, b12, iron, tags, season, prep_extra_min, tier, active, available_from, available_to, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, NOW(), NOW())
+     RETURNING *`,
+    [id, name, description || null, ingredients || [], slots || [], price, cal || 0, protein || 0, fat || 0, calcium || 0, vd || 0, b12 || 0, iron || 0, tags || [], season || null, prepExtraMin || 0, tier || 'basic', true, availableFrom || '07:00', availableTo || '22:00']
   );
 
-  res.status(201).json({ success: true, kitchenId: id });
+  res.status(201).json({ success: true, item: result.rows[0] });
+}));
+
+/**
+ * PUT /api/kitchens/:id/menu/:itemId
+ * Update a menu item
+ */
+router.put('/:id/menu/:itemId', authenticate, authorize('kitchen', 'admin'), asyncHandler(async (req, res) => {
+  const { id, itemId } = req.params;
+
+  if (req.user.role === 'kitchen' && req.user.kitchenId !== id) {
+    return res.status(403).json({ error: 'You can only edit your own kitchen items' });
+  }
+
+  const { name, description, ingredients, slots, price, cal, protein, fat, calcium, vd, b12, iron, tags, season, prepExtraMin, tier, active, availableFrom, availableTo } = req.body;
+
+  const result = await pool.query(
+    `UPDATE menu_items SET
+      name = COALESCE($1, name),
+      description = COALESCE($2, description),
+      ingredients = COALESCE($3, ingredients),
+      slots = COALESCE($4, slots),
+      price = COALESCE($5, price),
+      cal = COALESCE($6, cal),
+      protein = COALESCE($7, protein),
+      fat = COALESCE($8, fat),
+      calcium = COALESCE($9, calcium),
+      vd = COALESCE($10, vd),
+      b12 = COALESCE($11, b12),
+      iron = COALESCE($12, iron),
+      tags = COALESCE($13, tags),
+      season = COALESCE($14, season),
+      prep_extra_min = COALESCE($15, prep_extra_min),
+      tier = COALESCE($16, tier),
+      active = COALESCE($17, active),
+      available_from = COALESCE($18, available_from),
+      available_to = COALESCE($19, available_to),
+      updated_at = NOW()
+     WHERE id = $20 AND kitchen_id = $21
+     RETURNING *`,
+    [name, description, ingredients, slots, price, cal, protein, fat, calcium, vd, b12, iron, tags, season, prepExtraMin, tier, active, availableFrom, availableTo, itemId, id]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: 'Menu item not found' });
+  }
+
+  res.json({ success: true, item: result.rows[0] });
+}));
+
+/**
+ * DELETE /api/kitchens/:id/menu/:itemId
+ * Delete a menu item
+ */
+router.delete('/:id/menu/:itemId', authenticate, authorize('kitchen', 'admin'), asyncHandler(async (req, res) => {
+  const { id, itemId } = req.params;
+
+  if (req.user.role === 'kitchen' && req.user.kitchenId !== id) {
+    return res.status(403).json({ error: 'You can only delete your own kitchen items' });
+  }
+
+  const result = await pool.query(
+    'DELETE FROM menu_items WHERE id = $1 AND kitchen_id = $2 RETURNING id',
+    [itemId, id]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: 'Menu item not found' });
+  }
+
+  res.json({ success: true, message: 'Menu item deleted' });
+}));
+
+/**
+ * PATCH /api/kitchens/:id/menu/:itemId/toggle
+ * Toggle menu item active status
+ */
+router.patch('/:id/menu/:itemId/toggle', authenticate, authorize('kitchen', 'admin'), asyncHandler(async (req, res) => {
+  const { id, itemId } = req.params;
+
+  if (req.user.role === 'kitchen' && req.user.kitchenId !== id) {
+    return res.status(403).json({ error: 'You can only toggle your own kitchen items' });
+  }
+
+  const result = await pool.query(
+    `UPDATE menu_items SET active = NOT active, updated_at = NOW() WHERE id = $1 AND kitchen_id = $2 RETURNING id, name, active`,
+    [itemId, id]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: 'Menu item not found' });
+  }
+
+  res.json({ success: true, item: result.rows[0] });
+}));
+
+/**
+ * POST /api/kitchens/:id/photo
+ * Upload kitchen photo
+ */
+router.post('/:id/photo', authenticate, authorize('kitchen', 'admin'), upload.single('photo'), asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  if (req.user.role === 'kitchen' && req.user.kitchenId !== id) {
+    return res.status(403).json({ error: 'You can only update your own kitchen photo' });
+  }
+
+  if (!req.file) {
+    return res.status(400).json({ error: 'No photo uploaded' });
+  }
+
+  const photoUrl = `/uploads/${req.file.filename}`;
+
+  await pool.query(
+    'UPDATE kitchens SET photo_url = $1, updated_at = NOW() WHERE id = $2',
+    [photoUrl, id]
+  );
+
+  res.json({ success: true, photoUrl });
+}));
+
+/**
+ * POST /api/kitchens/:id/menu/:itemId/photo
+ * Upload food photo for a menu item
+ */
+router.post('/:id/menu/:itemId/photo', authenticate, authorize('kitchen', 'admin'), upload.single('photo'), asyncHandler(async (req, res) => {
+  const { id, itemId } = req.params;
+
+  if (req.user.role === 'kitchen' && req.user.kitchenId !== id) {
+    return res.status(403).json({ error: 'You can only update your own kitchen items' });
+  }
+
+  if (!req.file) {
+    return res.status(400).json({ error: 'No photo uploaded' });
+  }
+
+  const photoUrl = `/uploads/${req.file.filename}`;
+
+  await pool.query(
+    'UPDATE menu_items SET photo_url = $1, updated_at = NOW() WHERE id = $2 AND kitchen_id = $3',
+    [photoUrl, itemId, id]
+  );
+
+  res.json({ success: true, photoUrl });
+}));
+
+/**
+ * PUT /api/kitchens/:id/profile
+ * Update kitchen profile
+ */
+router.put('/:id/profile', authenticate, authorize('kitchen', 'admin'), asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  if (req.user.role === 'kitchen' && req.user.kitchenId !== id) {
+    return res.status(403).json({ error: 'You can only update your own profile' });
+  }
+
+  const { name, phone, address, openingTime, closingTime, lat, lng } = req.body;
+
+  await pool.query(
+    `UPDATE kitchens SET
+      name = COALESCE($1, name),
+      phone = COALESCE($2, phone),
+      address = COALESCE($3, address),
+      opening_time = COALESCE($4, opening_time),
+      closing_time = COALESCE($5, closing_time),
+      lat = COALESCE($6, lat),
+      lng = COALESCE($7, lng),
+      updated_at = NOW()
+     WHERE id = $8`,
+    [name, phone, address, openingTime, closingTime, lat, lng, id]
+  );
+
+  res.json({ success: true, message: 'Profile updated' });
+}));
+
+/**
+ * GET /api/kitchens/:id/earnings
+ * Get kitchen earnings (kitchen owner only)
+ */
+router.get('/:id/earnings', authenticate, authorize('kitchen', 'admin'), asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  if (req.user.role === 'kitchen' && req.user.kitchenId !== id) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  // Today's earnings
+  const today = await pool.query(
+    `SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE kitchen_id = $1 AND status = 'delivered' AND DATE(placed_at) = CURRENT_DATE`,
+    [id]
+  );
+
+  // This week
+  const week = await pool.query(
+    `SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE kitchen_id = $1 AND status = 'delivered' AND placed_at >= DATE_TRUNC('week', CURRENT_DATE)`,
+    [id]
+  );
+
+  // This month
+  const month = await pool.query(
+    `SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE kitchen_id = $1 AND status = 'delivered' AND placed_at >= DATE_TRUNC('month', CURRENT_DATE)`,
+    [id]
+  );
+
+  // Total orders count
+  const counts = await pool.query(
+    `SELECT status, COUNT(*) as count FROM orders WHERE kitchen_id = $1 GROUP BY status`,
+    [id]
+  );
+
+  // Popular items
+  const popular = await pool.query(
+    `SELECT items_by_meal FROM orders WHERE kitchen_id = $1 AND status = 'delivered'`,
+    [id]
+  );
+
+  // Parse popular items
+  const itemCounts = {};
+  popular.rows.forEach(row => {
+    const meals = row.items_by_meal;
+    if (meals) {
+      Object.values(meals).forEach(items => {
+        if (Array.isArray(items)) {
+          items.forEach(item => {
+            itemCounts[item.name] = (itemCounts[item.name] || 0) + (item.qty || 1);
+          });
+        }
+      });
+    }
+  });
+
+  const popularItems = Object.entries(itemCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([name, count]) => ({ name, count }));
+
+  res.json({
+    today: parseFloat(today.rows[0].total),
+    week: parseFloat(week.rows[0].total),
+    month: parseFloat(month.rows[0].total),
+    orderCounts: counts.rows,
+    popularItems,
+  });
 }));
 
 module.exports = router;

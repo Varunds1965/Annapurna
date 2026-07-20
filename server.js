@@ -1,6 +1,6 @@
 /**
- * Thali Plan — Main Server
- * Express 5 + WebSocket + PostgreSQL
+ * Thali Plan — Main Server (Production Ready)
+ * Express 5 + WebSocket + PostgreSQL + JWT Auth + UPI Payments
  */
 require('dotenv').config();
 
@@ -10,14 +10,19 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const http = require('http');
 const path = require('path');
+const fs = require('fs');
 
 const { pool } = require('./src/db/pool');
 const { errorHandler } = require('./src/middleware/errorHandler');
 const { initWebSocket } = require('./src/services/websocket');
 
 // Route imports
+const authRouter = require('./src/routes/auth');
 const ordersRouter = require('./src/routes/orders');
 const kitchensRouter = require('./src/routes/kitchens');
+const analyticsRouter = require('./src/routes/analytics');
+const subscriptionsRouter = require('./src/routes/subscriptions');
+const reviewsRouter = require('./src/routes/reviews');
 
 const app = express();
 const server = http.createServer(app);
@@ -32,20 +37,111 @@ app.use(express.urlencoded({ extended: true }));
 // ─── Static Files ──────────────────────────────────────
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Serve uploaded files
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+app.use('/uploads', express.static(uploadsDir));
+
 // ─── API Routes ─────────────────────────────────────────
+app.use('/api/auth', authRouter);
 app.use('/api/orders', ordersRouter);
 app.use('/api/kitchens', kitchensRouter);
+app.use('/api/analytics', analyticsRouter);
+app.use('/api/subscriptions', subscriptionsRouter);
+app.use('/api/reviews', reviewsRouter);
 
-// OTP endpoint (stub - integrates with your chosen SMS provider)
-app.post('/api/send-otp', (req, res) => {
-  const { phone } = req.body;
-  if (!phone) return res.status(400).json({ error: 'Phone number required' });
-  // In production: integrate with Twilio Verify, MSG91, etc.
-  console.log(`📱 OTP requested for ${phone} — demo mode: OTP is 0000`);
-  res.json({ success: true, message: 'OTP sent (demo: use 0000)' });
+// Payment routes
+app.post('/api/payments/create', async (req, res) => {
+  try {
+    const { createPhonePePayment } = require('./src/services/payment');
+    const { amount, orderId, customerName, customerMobile } = req.body;
+    const result = await createPhonePePayment(amount, orderId, customerName, customerMobile);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Health check — this one handles its own errors, no asyncHandler needed
+app.post('/api/payments/verify', async (req, res) => {
+  try {
+    const { verifyPayment } = require('./src/services/payment');
+    const { orderId, transactionId } = req.body;
+    const result = await verifyPayment(orderId, transactionId);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Payment webhook endpoint
+app.post('/api/payments/webhook', async (req, res) => {
+  const { handleWebhook } = require('./src/services/payment');
+  const signature = req.headers['x-webhook-signature'] || req.headers['x-signature'];
+  const result = await handleWebhook(req.body, signature);
+  res.json(result);
+});
+
+// PhonePe callback
+app.post('/api/payments/phonepe-callback', (req, res) => {
+  console.log('PhonePe callback received:', req.body);
+  res.redirect('/customer.html?payment=success');
+});
+
+// PhonePe webhook
+app.post('/api/payments/phonepe-webhook', async (req, res) => {
+  console.log('PhonePe webhook received:', req.body);
+  const { verifyPayment } = require('./src/services/payment');
+  if (req.body && req.body.transactionId && req.body.orderId) {
+    await verifyPayment(req.body.orderId, req.body.transactionId);
+  }
+  res.json({ success: true });
+});
+
+// Coupon validation endpoint
+app.post('/api/coupons/validate', async (req, res) => {
+  try {
+    const { code, orderTotal } = req.body;
+    if (!code) return res.status(400).json({ error: 'Coupon code required' });
+
+    const result = await pool.query(
+      `SELECT * FROM coupons WHERE code = $1 AND active = true AND (expires_at IS NULL OR expires_at > NOW()) AND used_count < usage_limit`,
+      [code.toUpperCase()]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Invalid or expired coupon' });
+    }
+
+    const coupon = result.rows[0];
+    if (parseFloat(orderTotal) < parseFloat(coupon.min_order)) {
+      return res.status(400).json({ error: `Minimum order of ₹${coupon.min_order} required` });
+    }
+
+    let discount = coupon.discount_type === 'percentage'
+      ? (parseFloat(orderTotal) * parseFloat(coupon.discount_value) / 100)
+      : parseFloat(coupon.discount_value);
+
+    if (coupon.max_discount && discount > parseFloat(coupon.max_discount)) {
+      discount = parseFloat(coupon.max_discount);
+    }
+
+    res.json({
+      success: true,
+      coupon: {
+        code: coupon.code,
+        description: coupon.description,
+        discountType: coupon.discount_type,
+        discountValue: parseFloat(coupon.discount_value),
+        discount,
+        maxDiscount: coupon.max_discount ? parseFloat(coupon.max_discount) : null,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Health check
 app.get('/api/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
@@ -55,7 +151,7 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// Calendar events endpoint (for kitchen dashboard calendar view)
+// Calendar events endpoint
 app.get('/api/calendar/events', async (req, res) => {
   const { getUpcomingPrepSlots } = require('./src/services/calendar');
   const fromDate = req.query.from ? new Date(req.query.from) : new Date();
@@ -74,18 +170,7 @@ app.get('/api/calendar/events', async (req, res) => {
   res.json(formatted);
 });
 
-// Payment webhook endpoint
-app.post('/api/payments/webhook', async (req, res) => {
-  const { handleWebhook } = require('./src/services/payment');
-  const signature = req.headers['x-webhook-signature'] || req.headers['x-signature'];
-  const result = await handleWebhook(req.body, signature);
-  res.json(result);
-});
-
 // ─── SPA fallback ───────────────────────────────────────
-// Express 5 middleware-based catch-all (no wildcard route needed)
-// The static middleware above already serves kitchen.html, admin.html, etc.
-// This catches any remaining GET requests and serves the SPA
 app.use((req, res, next) => {
   if (req.method === 'GET' && !req.path.startsWith('/api/') && !req.path.includes('.')) {
     return res.sendFile(path.join(__dirname, 'public', 'customer.html'));
@@ -111,11 +196,13 @@ server.listen(PORT, HOST, () => {
 ║  API:      http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/api  ║
 ║  Customer: http://localhost:${PORT}                  ║
 ║  Kitchen:  http://localhost:${PORT}/kitchen.html     ║
-║  Admin:    http://localhost:${PORT}/admin            ║
+║  Admin:    http://localhost:${PORT}/admin.html       ║
+║  Register: http://localhost:${PORT}/kitchen-register.html ║
 ║  WebSocket: ws://localhost:${PORT}/ws                ║
 ║──────────────────────────────────────────║
 ║  DB:       ${process.env.DB_NAME || 'thaliplan'}                    ║
 ║  Node:     ${process.version}                         ║
+║  UPI:      ${process.env.UPI_VPA || '917676531524@ibl'}          ║
 ╚══════════════════════════════════════════╝
   `);
 });

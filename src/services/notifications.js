@@ -126,7 +126,52 @@ async function sendSMS(to, message) {
 }
 
 /**
- * Send status update notification
+ * Send WhatsApp message via Twilio WhatsApp API
+ * Falls back gracefully if WhatsApp sender is not configured
+ */
+async function sendWhatsApp(to, message) {
+  const whatsappFrom = process.env.TWILIO_WHATSAPP_NUMBER;
+  if (!whatsappFrom) {
+    console.log('ℹ WhatsApp sender not configured (set TWILIO_WHATSAPP_NUMBER in .env) — falling back to SMS');
+    return await sendSMS(to, message);
+  }
+
+  const client = getTwilio();
+  if (!client) return;
+
+  try {
+    await client.messages.create({
+      from: `whatsapp:${whatsappFrom}`,
+      body: message,
+      to: `whatsapp:${to}`,
+    });
+    console.log(`✓ WhatsApp sent to ${to}`);
+  } catch (err) {
+    console.error('WhatsApp send failed:', err.message);
+    // Fallback to SMS on failure
+    console.log('ℹ Falling back to SMS');
+    await sendSMS(to, message);
+  }
+}
+
+/**
+ * Send an order confirmation via WhatsApp
+ */
+async function sendOrderConfirmationWhatsApp(order) {
+  const n = normalizeOrder(order);
+  if (!n.customer_mobile) return;
+
+  const itemsSummary = Object.entries(n.items_by_meal || {})
+    .map(([meal, items]) => `${meal}: ${items.map(i => `${i.name} ×${i.qty}`).join(', ')}`)
+    .join('\n');
+
+  const message = `🧆 *Thali Plan Order Confirmed* #${n.id.slice(-8)}\n\nThanks ${n.customer_name}! Your kitchen is preparing your meal.\n\n${itemsSummary}\n\nTotal: ₹${n.total}\nPayment: ${n.payment_method === 'upi' ? '✅ Paid via UPI' : '💵 Cash on delivery'}\n\n— Thali Plan`;
+
+  await sendWhatsApp(n.customer_mobile, message);
+}
+
+/**
+ * Send status update notification — WhatsApp + Email + SMS
  */
 async function sendStatusUpdate(order, newStatus) {
   const statusMessages = {
@@ -154,14 +199,16 @@ async function sendStatusUpdate(order, newStatus) {
     }
   }
 
-  // SMS
+  // WhatsApp (with SMS fallback)
   if (order.customer_mobile) {
-    await sendSMS(order.customer_mobile, message);
+    await sendWhatsApp(order.customer_mobile, message);
   }
 }
 
 module.exports = {
   sendOrderConfirmationEmail,
+  sendOrderConfirmationWhatsApp,
   sendStatusUpdate,
   sendSMS,
+  sendWhatsApp,
 };

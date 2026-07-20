@@ -5,7 +5,7 @@ const { Router } = require('express');
 const { pool } = require('../db/pool');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { blockMealPrepSlot, updateEventStatus } = require('../services/calendar');
-const { sendOrderConfirmationEmail, sendStatusUpdate } = require('../services/notifications');
+const { sendOrderConfirmationEmail, sendOrderConfirmationWhatsApp, sendStatusUpdate } = require('../services/notifications');
 const { broadcastNewOrder, broadcastOrderUpdate, broadcastPayment } = require('../services/websocket');
 const { v4: uuidv4 } = require('uuid');
 
@@ -50,10 +50,11 @@ router.post('/', asyncHandler(async (req, res) => {
     }
   }
 
-  // Notification
+  // Notifications
   if (customerEmail) {
     sendOrderConfirmationEmail(order).catch(() => {});
   }
+  sendOrderConfirmationWhatsApp(order).catch(() => {});
 
   // Real-time broadcast
   broadcastNewOrder(order);
