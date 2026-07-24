@@ -2,7 +2,7 @@
  * Thali Plan — Service Worker
  * PWA support with offline fallback and push notifications
  */
-const CACHE_NAME = 'thali-plan-v2';
+const CACHE_NAME = 'thali-plan-v3';
 const STATIC_ASSETS = [
   '/',
   '/customer.html',
