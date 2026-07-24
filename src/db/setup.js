@@ -296,6 +296,7 @@ async function setupDatabase() {
     await client.query(`ALTER TABLE kitchens ADD COLUMN IF NOT EXISTS opening_time TIME DEFAULT '07:00';`);
     await client.query(`ALTER TABLE kitchens ADD COLUMN IF NOT EXISTS closing_time TIME DEFAULT '22:00';`);
     await client.query(`ALTER TABLE kitchens ADD COLUMN IF NOT EXISTS photo_url TEXT;`);
+    await client.query(`ALTER TABLE kitchens ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`);
 
     await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_eta TIMESTAMP;`);
     await client.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT 'Other';`);
