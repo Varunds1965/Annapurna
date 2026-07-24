@@ -34,23 +34,37 @@ setInterval(() => {
 
 /**
  * POST /api/auth/send-otp
- * Send OTP to customer's mobile number
+ * Send OTP via the customer's chosen channel: 'mobile' (SMS) or 'email' (Gmail).
+ * Only one identifier is required — whichever matches the chosen channel.
  */
 router.post('/send-otp', otpLimiter, asyncHandler(async (req, res) => {
-  const { mobile, name, email } = req.body;
+  const { mobile, name, email, channel } = req.body;
 
-  if (!mobile || !/^[6-9]\d{9}$/.test(mobile)) {
-    return res.status(400).json({ error: 'Valid 10-digit mobile number required' });
+  if (channel !== 'mobile' && channel !== 'email') {
+    return res.status(400).json({ error: 'channel must be "mobile" or "email"' });
   }
 
-  // Send OTP — pass email for free email delivery, never returns OTP to client
-  const result = await sendOTP(mobile, email, name);
+  if (channel === 'mobile' && (!mobile || !/^[6-9]\d{9}$/.test(mobile))) {
+    return res.status(400).json({ error: 'Valid 10-digit mobile number required' });
+  }
+  if (channel === 'email' && (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
+    return res.status(400).json({ error: 'Valid email address required' });
+  }
+
+  const identifier = channel === 'mobile' ? mobile : email.toLowerCase();
+  const otpKey = `${channel}:${identifier}`;
+
+  // Send OTP only via the chosen channel — no silent fallback to the other one.
+  const result = channel === 'email'
+    ? await sendOTP(null, identifier, name)
+    : await sendOTP(identifier, null, name);
 
   // Store OTP temporarily (5 minutes) — server-side only
-  otpStore.set(mobile, {
+  otpStore.set(otpKey, {
     otp: result.otp,
     name: name || '',
-    email: email || '',
+    channel,
+    identifier,
     expiresAt: Date.now() + 5 * 60 * 1000,
     attempts: 0,
     method: result.method || 'unknown',
@@ -59,36 +73,42 @@ router.post('/send-otp', otpLimiter, asyncHandler(async (req, res) => {
   // NEVER send OTP back to client — only success/failure
   res.json({
     success: true,
-    message: 'OTP sent successfully. Check your email or SMS.',
+    message: channel === 'email' ? 'OTP sent to your email.' : 'OTP sent via SMS.',
     method: result.method || 'unknown',
   });
 }));
 
 /**
  * POST /api/auth/verify-otp
- * Verify OTP and create/login customer
+ * Verify OTP and create/login customer. Same channel used to send must be
+ * passed back here, along with the matching identifier (mobile or email).
  */
 router.post('/verify-otp', asyncHandler(async (req, res) => {
-  const { mobile, otp } = req.body;
+  const { mobile, email, channel, otp } = req.body;
 
-  if (!mobile || !otp) {
-    return res.status(400).json({ error: 'Mobile and OTP required' });
+  if (channel !== 'mobile' && channel !== 'email') {
+    return res.status(400).json({ error: 'channel must be "mobile" or "email"' });
+  }
+  const identifier = channel === 'mobile' ? mobile : (email || '').toLowerCase();
+  if (!identifier || !otp) {
+    return res.status(400).json({ error: `${channel === 'mobile' ? 'Mobile number' : 'Email'} and OTP required` });
   }
 
-  const stored = otpStore.get(mobile);
+  const otpKey = `${channel}:${identifier}`;
+  const stored = otpStore.get(otpKey);
   if (!stored) {
-    return res.status(400).json({ error: 'No OTP requested for this number. Please request OTP first.' });
+    return res.status(400).json({ error: 'No OTP requested for this. Please request OTP first.' });
   }
 
   if (Date.now() > stored.expiresAt) {
-    otpStore.delete(mobile);
+    otpStore.delete(otpKey);
     return res.status(400).json({ error: 'OTP expired. Please request a new one.' });
   }
 
   // Check attempts
   stored.attempts += 1;
   if (stored.attempts > 3) {
-    otpStore.delete(mobile);
+    otpStore.delete(otpKey);
     return res.status(400).json({ error: 'Too many failed attempts. Please request a new OTP.' });
   }
 
@@ -97,34 +117,34 @@ router.post('/verify-otp', asyncHandler(async (req, res) => {
   }
 
   // OTP verified — create or update customer
-  otpStore.delete(mobile);
+  otpStore.delete(otpKey);
 
-  // Check if customer exists
+  // Look up by whichever identifier this channel used
+  const lookupColumn = channel === 'mobile' ? 'mobile' : 'email';
   let customerResult = await pool.query(
-    'SELECT * FROM customers WHERE mobile = $1',
-    [mobile]
+    `SELECT * FROM customers WHERE ${lookupColumn} = $1`,
+    [identifier]
   );
 
   let customer;
   if (customerResult.rows.length === 0) {
-    // Create new customer
+    // Create new customer — mobile or email may be null depending on channel used
     const newResult = await pool.query(
       `INSERT INTO customers (name, email, mobile, created_at, updated_at)
        VALUES ($1, $2, $3, NOW(), NOW())
        RETURNING *`,
-      [stored.name || 'Guest', stored.email || null, mobile]
+      [stored.name || 'Guest', channel === 'email' ? identifier : null, channel === 'mobile' ? identifier : null]
     );
     customer = newResult.rows[0];
   } else {
     customer = customerResult.rows[0];
-    // Update name/email if provided
+    // Update name if provided
     if (stored.name) {
       await pool.query(
-        'UPDATE customers SET name = $1, email = COALESCE($2, email), updated_at = NOW() WHERE id = $3',
-        [stored.name, stored.email, customer.id]
+        'UPDATE customers SET name = $1, updated_at = NOW() WHERE id = $2',
+        [stored.name, customer.id]
       );
       customer.name = stored.name;
-      if (stored.email) customer.email = stored.email;
     }
   }
 
@@ -146,7 +166,39 @@ router.post('/verify-otp', asyncHandler(async (req, res) => {
       mobile: customer.mobile,
       avatar: customer.avatar,
     },
+    profileComplete: customer.age !== null && customer.age !== undefined,
   });
+}));
+
+/**
+ * PUT /api/auth/customer/profile
+ * Save the customer's nutrition profile (age, weight, height, goal, etc.)
+ * so menu recommendations can be personalized to them.
+ */
+router.put('/customer/profile', authenticate, authorize('customer'), asyncHandler(async (req, res) => {
+  const { age, weight, height, gender, goal, dietPref, dislikedFoods, deficiencies } = req.body;
+
+  const result = await pool.query(
+    `UPDATE customers SET
+      age = COALESCE($1, age),
+      weight = COALESCE($2, weight),
+      height = COALESCE($3, height),
+      gender = COALESCE($4, gender),
+      goal = COALESCE($5, goal),
+      diet_pref = COALESCE($6, diet_pref),
+      disliked_foods = COALESCE($7, disliked_foods),
+      deficiencies = COALESCE($8, deficiencies),
+      updated_at = NOW()
+     WHERE id = $9
+     RETURNING id, name, email, mobile, age, weight, height, gender, goal, diet_pref, disliked_foods, deficiencies`,
+    [age || null, weight || null, height || null, gender || null, goal || null, dietPref || null, dislikedFoods || null, deficiencies || null, req.user.id]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: 'Customer not found' });
+  }
+
+  res.json({ success: true, customer: result.rows[0] });
 }));
 
 /**
@@ -214,8 +266,10 @@ router.post('/kitchen/login', asyncHandler(async (req, res) => {
 router.post('/admin/login', asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  // Simple admin check — in production, use proper admin table
-  if (email !== 'admin@thaliplan.com' || password !== 'admin123') {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+
+  if (!adminEmail || !adminPassword || email !== adminEmail || password !== adminPassword) {
     return res.status(401).json({ error: 'Invalid admin credentials' });
   }
 
@@ -241,7 +295,7 @@ router.get('/me', authenticate, asyncHandler(async (req, res) => {
   const { role, id } = req.user;
 
   if (role === 'customer') {
-    const result = await pool.query('SELECT id, name, email, mobile, avatar, age, weight, height, gender, goal, diet_pref, tier FROM customers WHERE id = $1', [id]);
+    const result = await pool.query('SELECT id, name, email, mobile, avatar, age, weight, height, gender, goal, diet_pref, disliked_foods, deficiencies, tier FROM customers WHERE id = $1', [id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
     return res.json({ user: result.rows[0], role: 'customer' });
   }

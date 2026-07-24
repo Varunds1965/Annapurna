@@ -31,7 +31,11 @@
   .badge.nonveg{color:var(--chili);border:1px solid var(--chili);}
   .badge.active{background:rgba(107,143,92,0.15);color:var(--curry);}
   .badge.inactive{background:rgba(194,74,59,0.15);color:var(--chili);}
+  .badge.pending{background:rgba(217,164,65,0.15);color:var(--turmeric);}
   .badge.placed{color:var(--turmeric);border:1px solid var(--turmeric);}
+  .badge.confirmed{color:var(--sky);border:1px solid var(--sky);}
+  .badge.preparing{color:var(--turmeric);border:1px solid var(--turmeric);}
+  .badge.out_for_delivery{color:var(--curry);border:1px solid var(--curry);}
   .badge.delivered{color:var(--curry);border:1px solid var(--curry);background:rgba(107,143,92,0.1);}
   .badge.cancelled{color:var(--chili);border:1px solid var(--chili);}
   .btn{background:var(--turmeric);color:#1E1B18;border:none;padding:8px 16px;border-radius:6px;font-size:12.5px;font-weight:600;cursor:pointer;}
@@ -43,7 +47,7 @@
   label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint);}
   input,select,textarea{width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:10px 12px;border-radius:6px;font-size:14px;}
   .empty{color:var(--text-faint);font-size:13px;padding:16px 0;}
-  .flex{display:flex;gap:10px;flex-wrap:wrap;}
+  .flex{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
   .login-panel{max-width:360px;margin:80px auto;text-align:center;}
   .login-panel .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:32px 24px;}
   .login-panel h2{font-family:'Fraunces',serif;margin:0 0 4px;}
@@ -52,7 +56,19 @@
   .login-panel button{width:100%;padding:14px;border-radius:9px;font-weight:700;font-size:15px;cursor:pointer;}
   .toast{position:fixed;bottom:20px;right:20px;background:var(--curry);color:#1E1B18;padding:12px 20px;border-radius:8px;font-weight:600;font-size:13px;z-index:300;display:none;}
   .toast.show{display:block;}
-  .toast.error{background:var(--chili);}
+  .toast.error{background:var(--chili);color:#fff;}
+  .small-note{font-size:11px;color:var(--text-faint);margin:-4px 0 12px;}
+  .pw-wrap { position: relative; }
+  .pw-wrap input { width: 100%; padding-right: 40px; }
+  .pw-eye { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 16px; padding: 4px; line-height: 1; color: var(--text-faint); }
+  .pw-eye:hover { color: var(--text-dim); }
+  .pw-strength-bar { height: 4px; border-radius: 999px; background: var(--panel-2); overflow: hidden; margin-top: 6px; }
+  .pw-strength-bar span { display: block; height: 100%; width: 0%; border-radius: 999px; transition: width .2s, background .2s; }
+  .pw-strength-label { font-size: 10.5px; margin-top: 4px; color: var(--text-faint); }
+  .pw-reqs { list-style: none; padding: 0; margin: 6px 0 0; font-size: 10.5px; color: var(--text-faint); display: grid; gap: 2px; }
+  .pw-reqs li.met { color: var(--curry); }
+  .pw-reqs li::before { content: "○ "; }
+  .pw-reqs li.met::before { content: "✓ "; }
 </style>
 </head>
 <body>
@@ -60,8 +76,11 @@
   <div class="card">
     <h2>🛠 Admin Login</h2>
     <p class="sub">Enter your admin credentials</p>
-    <input type="email" id="login-email" placeholder="admin@thaliplan.com" value="admin@thaliplan.com">
-    <input type="password" id="login-password" placeholder="Password" value="admin123">
+    <input type="email" id="login-email" placeholder="Admin email">
+    <div class="pw-wrap">
+      <input type="password" id="login-password" placeholder="Password">
+      <button type="button" class="pw-eye" onclick="togglePw('login-password', this)" aria-label="Show password">👁</button>
+    </div>
     <button class="btn" id="login-btn" style="width:100%;">Log in</button>
   </div>
 </div>
@@ -76,11 +95,12 @@
       <button data-tab="menu">Menu</button>
       <button data-tab="coupons">Coupons</button>
     </div>
+    <button class="btn-sm" id="logout-btn">Logout</button>
   </header>
   <main>
     <div class="tab active" id="tab-overview">
       <div class="stat-row" id="overview-stats"></div>
-      <h3 style="font-family:'Fraunces',serif;margin:24px 0 12px;">Recent orders</h3>
+      <h3 style="font-family:'Fraunces',serif;margin:24px 0 12px;">Recent orders <span class="small-note" style="margin:0;">across all kitchens</span></h3>
       <table><thead><tr><th>Order</th><th>Customer</th><th>Kitchen</th><th>Total</th><th>Status</th><th>Time</th></tr></thead><tbody id="recent-orders"></tbody></table>
     </div>
     <div class="tab" id="tab-kitchens">
@@ -90,17 +110,30 @@
       </div>
       <div id="kitchen-form" style="display:none;">
         <form id="kitchen-form-el">
-          <label>Kitchen ID (slug) <input type="text" id="k-id" required placeholder="my-kitchen"></label>
           <label>Name <input type="text" id="k-name" required placeholder="My Kitchen"></label>
           <label>Email <input type="email" id="k-email" placeholder="kitchen@example.com"></label>
+          <label>Temporary password</label>
+          <div class="pw-wrap">
+            <input type="password" id="k-password" placeholder="Set a temporary password" required minlength="8" oninput="updateAdminPwStrength()">
+            <button type="button" class="pw-eye" onclick="togglePw('k-password', this)" aria-label="Show password">👁</button>
+          </div>
+          <div class="pw-strength-bar"><span id="kPwStrengthBar"></span></div>
+          <div class="pw-strength-label" id="kPwStrengthLabel"></div>
+          <ul class="pw-reqs" id="kPwReqs">
+            <li data-req="len">At least 8 characters</li>
+            <li data-req="upper">One uppercase letter</li>
+            <li data-req="lower">One lowercase letter</li>
+            <li data-req="num">One number</li>
+            <li data-req="special">One special character</li>
+          </ul>
           <label>Type <select id="k-type"><option value="veg">Vegetarian</option><option value="nonveg">Non-Vegetarian</option></select></label>
-          <label>Active <select id="k-active"><option value="true">Active</option><option value="false">Inactive</option></select></label>
           <label>Latitude <input type="number" id="k-lat" step="any" value="12.9716"></label>
           <label>Longitude <input type="number" id="k-lng" step="any" value="77.5946"></label>
           <button class="btn" type="submit">Save kitchen</button>
         </form>
       </div>
-      <table><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Status</th><th>Rating</th><th>Orders</th><th>Actions</th></tr></thead><tbody id="kitchens-list"></tbody></table>
+      <p class="small-note">Newly registered kitchens start inactive and need approval below before customers can see them.</p>
+      <table><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Status</th><th>Rating</th><th>Actions</th></tr></thead><tbody id="kitchens-list"></tbody></table>
     </div>
     <div class="tab" id="tab-orders">
       <div class="flex" style="margin-bottom:12px;">
@@ -117,7 +150,8 @@
       <table><thead><tr><th>Order ID</th><th>Customer</th><th>Kitchen</th><th>Total</th><th>Payment</th><th>Status</th><th>Placed</th></tr></thead><tbody id="all-orders"></tbody></table>
     </div>
     <div class="tab" id="tab-menu">
-      <table><thead><tr><th>Name</th><th>Kitchen</th><th>Tier</th><th>Slots</th><th>Price</th><th>Cal</th><th>Active</th></tr></thead><tbody id="menu-list"></tbody></table>
+      <p class="small-note">Menu items across every kitchen.</p>
+      <table><thead><tr><th>Name</th><th>Kitchen</th><th>Category</th><th>Tier</th><th>Slots</th><th>Price</th><th>Allergens</th><th>Active</th></tr></thead><tbody id="menu-list"></tbody></table>
     </div>
     <div class="tab" id="tab-coupons">
       <div class="flex" style="margin-bottom:16px;">
@@ -135,7 +169,7 @@
           <button class="btn" type="submit">Save coupon</button>
         </form>
       </div>
-      <table><thead><tr><th>Code</th><th>Type</th><th>Value</th><th>Min Order</th><th>Used</th><th>Limit</th><th>Active</th></tr></thead><tbody id="coupons-list"></tbody></table>
+      <table><thead><tr><th>Code</th><th>Type</th><th>Value</th><th>Min Order</th><th>Used</th><th>Limit</th><th>Active</th><th>Actions</th></tr></thead><tbody id="coupons-list"></tbody></table>
     </div>
   </main>
 </div>
@@ -144,6 +178,43 @@
 <script>
 const API_BASE = window.location.origin + '/api';
 let adminToken = localStorage.getItem('tp_admin_token') || null;
+let kitchensCache = [];
+
+// ── Password: show/hide toggle ──
+function togglePw(inputId, btn) {
+  const input = document.getElementById(inputId);
+  const showing = input.type === 'text';
+  input.type = showing ? 'password' : 'text';
+  btn.textContent = showing ? '👁' : '🙈';
+  btn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+}
+
+// ── Password strength check ──
+function checkPasswordRules(pw) {
+  return {
+    len: pw.length >= 8,
+    upper: /[A-Z]/.test(pw),
+    lower: /[a-z]/.test(pw),
+    num: /[0-9]/.test(pw),
+    special: /[^A-Za-z0-9]/.test(pw),
+  };
+}
+function isStrongPassword(pw) {
+  return Object.values(checkPasswordRules(pw)).every(Boolean);
+}
+function updateAdminPwStrength() {
+  const pw = document.getElementById('k-password').value;
+  const rules = checkPasswordRules(pw);
+  const metCount = Object.values(rules).filter(Boolean).length;
+  document.querySelectorAll('#kPwReqs li').forEach(li => li.classList.toggle('met', !!rules[li.dataset.req]));
+  const bar = document.getElementById('kPwStrengthBar');
+  const label = document.getElementById('kPwStrengthLabel');
+  bar.style.width = (metCount / 5 * 100) + '%';
+  if (!pw) { bar.style.background = 'transparent'; label.textContent = ''; }
+  else if (metCount <= 2) { bar.style.background = 'var(--chili)'; label.textContent = 'Weak'; }
+  else if (metCount <= 4) { bar.style.background = 'var(--turmeric)'; label.textContent = 'Medium'; }
+  else { bar.style.background = 'var(--curry)'; label.textContent = 'Strong'; }
+}
 
 async function api(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...options.headers };
@@ -162,6 +233,16 @@ function showToast(msg, isError = false) {
 }
 
 // ─── Login ─────────────────────────────────────────────
+function enterDashboard() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  loadOverview();
+  loadKitchens();
+  loadOrders();
+  loadMenu();
+  loadCoupons();
+}
+
 document.getElementById('login-btn').addEventListener('click', async () => {
   const email = document.getElementById('login-email').value;
   const password = document.getElementById('login-password').value;
@@ -172,28 +253,21 @@ document.getElementById('login-btn').addEventListener('click', async () => {
   if (data.success) {
     adminToken = data.token;
     localStorage.setItem('tp_admin_token', adminToken);
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('dashboard').style.display = 'block';
-    loadOverview();
-    loadKitchens();
-    loadOrders();
-    loadMenu();
-    loadCoupons();
+    enterDashboard();
   } else {
-    alert('Login failed: ' + (data.error || 'Invalid credentials'));
+    showToast('Login failed: ' + (data.error || 'Invalid credentials'), true);
   }
 });
 
+document.getElementById('logout-btn').addEventListener('click', () => {
+  adminToken = null;
+  localStorage.removeItem('tp_admin_token');
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'block';
+});
+
 // Check existing login
-if (adminToken) {
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('dashboard').style.display = 'block';
-  loadOverview();
-  loadKitchens();
-  loadOrders();
-  loadMenu();
-  loadCoupons();
-}
+if (adminToken) enterDashboard();
 
 // ─── Tabs ──────────────────────────────────────────────
 document.querySelectorAll('.tabs button').forEach(btn => {
@@ -212,7 +286,8 @@ document.querySelectorAll('.tabs button').forEach(btn => {
 
 // ─── Overview ──────────────────────────────────────────
 async function loadOverview() {
-  const orders = await api('/orders/home-kitchen');
+  const orders = await api('/orders/admin/all');
+  if (!Array.isArray(orders)) { document.getElementById('recent-orders').innerHTML = '<tr><td colspan="6" class="empty">Could not load orders — check you are logged in as admin.</td></tr>'; return; }
   const stats = { total: orders.length, placed: 0, delivered: 0, revenue: 0 };
   orders.forEach(o => {
     if (o.status === 'delivered') { stats.delivered++; stats.revenue += parseFloat(o.total); }
@@ -223,7 +298,7 @@ async function loadOverview() {
     <div class="stat"><div class="num">${stats.total}</div><div class="lbl">Total Orders</div></div>
     <div class="stat"><div class="num">${stats.placed}</div><div class="lbl">Pending</div></div>
     <div class="stat"><div class="num">${stats.delivered}</div><div class="lbl">Delivered</div></div>
-    <div class="stat"><div class="num">₹${stats.revenue}</div><div class="lbl">Revenue</div></div>
+    <div class="stat"><div class="num">₹${stats.revenue.toFixed(0)}</div><div class="lbl">Revenue</div></div>
   `;
 
   const recent = orders.slice(0, 10);
@@ -231,7 +306,7 @@ async function loadOverview() {
     <tr>
       <td class="mono">#${o.id.slice(-8)}</td>
       <td>${o.customerName}</td>
-      <td>${o.kitchenId}</td>
+      <td class="mono">${o.kitchenId}</td>
       <td>₹${o.total}</td>
       <td><span class="badge ${o.status}">${o.status.replace(/_/g,' ')}</span></td>
       <td class="mono">${new Date(o.placedAt).toLocaleString('en-IN')}</td>
@@ -241,26 +316,31 @@ async function loadOverview() {
 
 // ─── Kitchens ──────────────────────────────────────────
 async function loadKitchens() {
-  const kitchens = await api('/kitchens');
+  const kitchens = await api('/kitchens/admin/all');
+  if (!Array.isArray(kitchens)) { document.getElementById('kitchens-list').innerHTML = '<tr><td colspan="6" class="empty">Could not load kitchens.</td></tr>'; return; }
+  kitchensCache = kitchens;
   document.getElementById('kitchens-list').innerHTML = kitchens.map(k => `
     <tr>
       <td class="mono">${k.id}</td>
       <td>${k.name}</td>
       <td><span class="badge ${k.type}">${k.type}</span></td>
-      <td><span class="badge ${k.active ? 'active' : 'inactive'}">${k.active ? 'Active' : 'Inactive'}</span></td>
+      <td><span class="badge ${k.active ? 'active' : 'pending'}">${k.active ? 'Active' : 'Pending / Inactive'}</span></td>
       <td>${k.rating_text || 'N/A'}</td>
-      <td class="mono">-</td>
       <td>
-        <button class="btn-sm ${k.active ? 'danger' : 'success'}" onclick="toggleKitchen('${k.id}')">${k.active ? 'Deactivate' : 'Activate'}</button>
+        <button class="btn-sm ${k.active ? 'danger' : 'success'}" onclick="toggleKitchen('${k.id}')">${k.active ? 'Deactivate' : 'Approve'}</button>
       </td>
     </tr>
-  `).join('') || '<tr><td colspan="7" class="empty">No kitchens registered</td></tr>';
+  `).join('') || '<tr><td colspan="6" class="empty">No kitchens registered</td></tr>';
 }
 
 async function toggleKitchen(id) {
-  // Simple toggle via update
-  showToast('Kitchen status toggled (admin feature)');
-  loadKitchens();
+  const res = await api('/kitchens/' + id + '/toggle-active', { method: 'PATCH' });
+  if (res.success) {
+    showToast(res.active ? 'Kitchen approved and activated' : 'Kitchen deactivated');
+    loadKitchens();
+  } else {
+    showToast(res.error || 'Could not update kitchen', true);
+  }
 }
 
 document.getElementById('add-kitchen-btn').addEventListener('click', () => {
@@ -270,23 +350,28 @@ document.getElementById('add-kitchen-btn').addEventListener('click', () => {
 
 document.getElementById('kitchen-form-el').addEventListener('submit', async (e) => {
   e.preventDefault();
+  const password = document.getElementById('k-password').value;
+  if (!isStrongPassword(password)) {
+    showToast('Password must be at least 8 characters with uppercase, lowercase, a number, and a special character', true);
+    return;
+  }
   const data = {
-    id: document.getElementById('k-id').value,
     name: document.getElementById('k-name').value,
     email: document.getElementById('k-email').value,
+    password,
     type: document.getElementById('k-type').value,
-    active: document.getElementById('k-active').value === 'true',
     lat: parseFloat(document.getElementById('k-lat').value),
     lng: parseFloat(document.getElementById('k-lng').value),
   };
-  // Use register endpoint
   const result = await api('/kitchens/register', {
     method: 'POST',
-    body: JSON.stringify({ ...data, password: 'admin123' }),
+    body: JSON.stringify(data),
   });
   if (result.success) {
-    showToast('Kitchen added: ' + data.name);
+    showToast('Kitchen added — approve it below to make it visible to customers');
     document.getElementById('kitchen-form').style.display = 'none';
+    document.getElementById('kitchen-form-el').reset();
+    updateAdminPwStrength();
     loadKitchens();
   } else {
     showToast(result.error || 'Failed to add kitchen', true);
@@ -298,12 +383,13 @@ document.getElementById('refresh-kitchens-btn').addEventListener('click', loadKi
 // ─── Orders ────────────────────────────────────────────
 async function loadOrders() {
   const filter = document.getElementById('order-filter').value;
-  const orders = await api('/orders/home-kitchen' + (filter ? '?status=' + filter : ''));
+  const orders = await api('/orders/admin/all' + (filter ? '?status=' + filter : ''));
+  if (!Array.isArray(orders)) { document.getElementById('all-orders').innerHTML = '<tr><td colspan="7" class="empty">Could not load orders.</td></tr>'; return; }
   document.getElementById('all-orders').innerHTML = orders.map(o => `
     <tr>
       <td class="mono">#${o.id.slice(-8)}</td>
       <td>${o.customerName}</td>
-      <td>${o.kitchenId}</td>
+      <td class="mono">${o.kitchenId}</td>
       <td>₹${o.total}</td>
       <td>${o.paid ? '✅ Paid' : '💵 ' + (o.paymentMethod || 'COD')}</td>
       <td><span class="badge ${o.status}">${o.status.replace(/_/g,' ')}</span></td>
@@ -314,28 +400,66 @@ async function loadOrders() {
 
 document.getElementById('order-filter').addEventListener('change', loadOrders);
 
-// ─── Menu ──────────────────────────────────────────────
+// ─── Menu (aggregated across every kitchen) ───────────
 async function loadMenu() {
-  const items = await api('/kitchens/home-kitchen/menu');
-  document.getElementById('menu-list').innerHTML = items.map(i => `
+  const tbody = document.getElementById('menu-list');
+  tbody.innerHTML = '<tr><td colspan="8" class="empty">Loading…</td></tr>';
+  const kitchens = kitchensCache.length ? kitchensCache : await api('/kitchens/admin/all');
+  if (!Array.isArray(kitchens) || !kitchens.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">No kitchens yet</td></tr>'; return; }
+
+  const perKitchen = await Promise.all(kitchens.map(async k => {
+    const items = await api('/kitchens/' + k.id + '/menu');
+    return Array.isArray(items) ? items.map(i => ({ ...i, kitchenName: k.name, kitchenId: k.id })) : [];
+  }));
+  const allItems = perKitchen.flat();
+
+  tbody.innerHTML = allItems.map(i => `
     <tr>
       <td>${i.name}</td>
-      <td>home-kitchen</td>
+      <td>${i.kitchenName} <span class="mono" style="color:var(--text-faint);">(${i.kitchenId})</span></td>
+      <td><span class="badge active">${i.category || 'Other'}</span></td>
       <td><span class="badge ${i.tier}">${i.tier}</span></td>
       <td>${(i.slots || []).join(', ')}</td>
       <td>₹${i.price}</td>
-      <td>${i.cal || 0}</td>
+      <td>${(i.allergens || []).join(', ') || '—'}</td>
       <td><span class="badge ${i.active ? 'active' : 'inactive'}">${i.active ? 'Yes' : 'No'}</span></td>
     </tr>
-  `).join('') || '<tr><td colspan="7" class="empty">No menu items</td></tr>';
+  `).join('') || '<tr><td colspan="8" class="empty">No menu items yet</td></tr>';
 }
 
 // ─── Coupons ───────────────────────────────────────────
 async function loadCoupons() {
-  // Coupons are fetched via the validate endpoint — for listing we'll show a simple view
-  document.getElementById('coupons-list').innerHTML = `
-    <tr><td class="mono">WELCOME50</td><td>Fixed</td><td>₹50</td><td>₹200</td><td>0</td><td>1000</td><td><span class="badge active">Active</span></td></tr>
-  `;
+  const coupons = await api('/coupons');
+  const tbody = document.getElementById('coupons-list');
+  if (!Array.isArray(coupons)) { tbody.innerHTML = '<tr><td colspan="8" class="empty">Could not load coupons.</td></tr>'; return; }
+  tbody.innerHTML = coupons.map(c => `
+    <tr>
+      <td class="mono">${c.code}</td>
+      <td>${c.discount_type === 'percentage' ? 'Percentage' : 'Fixed'}</td>
+      <td>${c.discount_type === 'percentage' ? c.discount_value + '%' : '₹' + c.discount_value}</td>
+      <td>₹${c.min_order}</td>
+      <td>${c.used_count}</td>
+      <td>${c.usage_limit}</td>
+      <td><span class="badge ${c.active ? 'active' : 'inactive'}">${c.active ? 'Active' : 'Inactive'}</span></td>
+      <td>
+        <button class="btn-sm ${c.active ? 'danger' : 'success'}" onclick="toggleCoupon(${c.id})">${c.active ? 'Deactivate' : 'Activate'}</button>
+        <button class="btn-sm danger" onclick="deleteCoupon(${c.id})">Delete</button>
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="8" class="empty">No coupons yet</td></tr>';
+}
+
+async function toggleCoupon(id) {
+  const res = await api('/coupons/' + id + '/toggle', { method: 'PATCH' });
+  if (res.success) { showToast('Coupon updated'); loadCoupons(); }
+  else showToast(res.error || 'Could not update coupon', true);
+}
+
+async function deleteCoupon(id) {
+  if (!confirm('Delete this coupon?')) return;
+  const res = await api('/coupons/' + id, { method: 'DELETE' });
+  if (res.success) { showToast('Coupon deleted'); loadCoupons(); }
+  else showToast(res.error || 'Could not delete coupon', true);
 }
 
 document.getElementById('add-coupon-btn').addEventListener('click', () => {
@@ -345,8 +469,24 @@ document.getElementById('add-coupon-btn').addEventListener('click', () => {
 
 document.getElementById('coupon-form-el').addEventListener('submit', async (e) => {
   e.preventDefault();
-  showToast('Coupon created (via database seed)');
-  document.getElementById('coupon-form').style.display = 'none';
+  const data = {
+    code: document.getElementById('c-code').value.trim(),
+    description: document.getElementById('c-desc').value.trim(),
+    discountType: document.getElementById('c-type').value,
+    discountValue: parseFloat(document.getElementById('c-value').value),
+    minOrder: parseFloat(document.getElementById('c-min').value) || 0,
+    maxDiscount: document.getElementById('c-max').value ? parseFloat(document.getElementById('c-max').value) : null,
+    usageLimit: parseInt(document.getElementById('c-limit').value) || 100,
+  };
+  const result = await api('/coupons', { method: 'POST', body: JSON.stringify(data) });
+  if (result.success) {
+    showToast('Coupon created: ' + data.code);
+    document.getElementById('coupon-form').style.display = 'none';
+    document.getElementById('coupon-form-el').reset();
+    loadCoupons();
+  } else {
+    showToast(result.error || 'Failed to create coupon', true);
+  }
 });
 </script>
 </body>

@@ -110,7 +110,7 @@ async function sendOTPviaMSG91(mobile, otp) {
  * Generate a random OTP
  */
 function generateOTP() {
-  return String(Math.floor(1000 + Math.random() * 9000));
+  return String(Math.floor(100000 + Math.random() * 900000));
 }
 
 /**

@@ -6,11 +6,14 @@ const { Router } = require('express');
 const bcrypt = require('bcryptjs');
 const { pool } = require('../db/pool');
 const { asyncHandler } = require('../middleware/errorHandler');
-const { authenticate, authorize, generateToken } = require('../middleware/auth');
+const { authenticate, authorize, generateToken, optionalAuth } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+const { classifyFood } = require('../services/foodClassifier');
+const { generateFoodImage } = require('../services/imageGeneration');
+const { computeTargets, scoreItem } = require('../services/nutritionEngine');
 
 const router = Router();
 
@@ -49,6 +52,11 @@ router.post('/register', asyncHandler(async (req, res) => {
 
   if (!name || !email || !password || !type) {
     return res.status(400).json({ error: 'Name, email, password, and type (veg/nonveg) are required' });
+  }
+
+  const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+  if (!strongPasswordRegex.test(password)) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character' });
   }
 
   if (!['veg', 'nonveg'].includes(type)) {
@@ -111,10 +119,22 @@ router.get('/', asyncHandler(async (req, res) => {
 }));
 
 /**
+ * GET /api/kitchens/admin/all
+ * Admin: list every kitchen regardless of active/approval status
+ * Registered before /:id so "admin" isn't swallowed as a kitchen ID
+ */
+router.get('/admin/all', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT id, name, email, type, active, rating_text, lat, lng, address, photo_url, opening_time, closing_time, created_at FROM kitchens ORDER BY created_at DESC'
+  );
+  res.json(result.rows);
+}));
+
+/**
  * GET /api/kitchens/:id
  * Get kitchen details with menu
  */
-router.get('/:id', asyncHandler(async (req, res) => {
+router.get('/:id', optionalAuth, asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   const kitchenResult = await pool.query(
@@ -131,9 +151,29 @@ router.get('/:id', asyncHandler(async (req, res) => {
     [id]
   );
 
+  let menu = menuResult.rows;
+  if (req.user && req.user.role === 'customer') {
+    const customerResult = await pool.query(
+      'SELECT age, weight, height, gender, goal, disliked_foods, deficiencies FROM customers WHERE id = $1',
+      [req.user.id]
+    );
+    const profile = customerResult.rows[0];
+    if (profile && profile.age) {
+      const targets = computeTargets(profile);
+      const dislikedFoods = (profile.disliked_foods || '').split(',').map(s => s.trim()).filter(Boolean);
+      menu = menu
+        .map(item => {
+          const { score, disliked } = scoreItem(item, targets, dislikedFoods);
+          return { ...item, matchScore: score, disliked };
+        })
+        .sort((a, b) => b.matchScore - a.matchScore)
+        .map((item, i) => ({ ...item, recommended: i < 3 && !item.disliked }));
+    }
+  }
+
   res.json({
     ...kitchenResult.rows[0],
-    menu: menuResult.rows,
+    menu,
   });
 }));
 
@@ -141,7 +181,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
  * GET /api/kitchens/:id/menu
  * Get kitchen's menu items
  */
-router.get('/:id/menu', asyncHandler(async (req, res) => {
+router.get('/:id/menu', optionalAuth, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { tier, slot } = req.query;
 
@@ -159,6 +199,27 @@ router.get('/:id/menu', asyncHandler(async (req, res) => {
   let items = result.rows;
   if (slot) {
     items = items.filter(item => item.slots && item.slots.includes(slot));
+  }
+
+  // Personalize + sort by nutrition fit, but only for a logged-in customer
+  // who has completed their nutrition profile (age is the completeness signal).
+  if (req.user && req.user.role === 'customer') {
+    const customerResult = await pool.query(
+      'SELECT age, weight, height, gender, goal, disliked_foods, deficiencies FROM customers WHERE id = $1',
+      [req.user.id]
+    );
+    const profile = customerResult.rows[0];
+    if (profile && profile.age) {
+      const targets = computeTargets(profile);
+      const dislikedFoods = (profile.disliked_foods || '').split(',').map(s => s.trim()).filter(Boolean);
+      items = items
+        .map(item => {
+          const { score, disliked } = scoreItem(item, targets, dislikedFoods);
+          return { ...item, matchScore: score, disliked };
+        })
+        .sort((a, b) => b.matchScore - a.matchScore)
+        .map((item, i) => ({ ...item, recommended: i < 3 && !item.disliked }));
+    }
   }
 
   res.json(items);
@@ -182,11 +243,14 @@ router.post('/:id/menu', authenticate, authorize('kitchen', 'admin'), asyncHandl
     return res.status(400).json({ error: 'Name and price are required' });
   }
 
+  // Auto-categorize and detect allergens from the name/description/ingredients
+  const { category, allergens } = classifyFood(name, description, ingredients);
+
   const result = await pool.query(
-    `INSERT INTO menu_items (kitchen_id, name, description, ingredients, slots, price, cal, protein, fat, calcium, vd, b12, iron, tags, season, prep_extra_min, tier, active, available_from, available_to, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, NOW(), NOW())
+    `INSERT INTO menu_items (kitchen_id, name, description, ingredients, slots, price, cal, protein, fat, calcium, vd, b12, iron, tags, season, prep_extra_min, tier, active, available_from, available_to, category, allergens, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, NOW(), NOW())
      RETURNING *`,
-    [id, name, description || null, ingredients || [], slots || [], price, cal || 0, protein || 0, fat || 0, calcium || 0, vd || 0, b12 || 0, iron || 0, tags || [], season || null, prepExtraMin || 0, tier || 'basic', true, availableFrom || '07:00', availableTo || '22:00']
+    [id, name, description || null, ingredients || [], slots || [], price, cal || 0, protein || 0, fat || 0, calcium || 0, vd || 0, b12 || 0, iron || 0, tags || [], season || null, prepExtraMin || 0, tier || 'basic', true, availableFrom || '07:00', availableTo || '22:00', category, allergens]
   );
 
   res.status(201).json({ success: true, item: result.rows[0] });
@@ -204,6 +268,17 @@ router.put('/:id/menu/:itemId', authenticate, authorize('kitchen', 'admin'), asy
   }
 
   const { name, description, ingredients, slots, price, cal, protein, fat, calcium, vd, b12, iron, tags, season, prepExtraMin, tier, active, availableFrom, availableTo } = req.body;
+
+  // Merge with the existing row so classification reflects the final state,
+  // even if this request only touched a couple of fields (e.g. just toggling tier).
+  const existing = await pool.query('SELECT name, description, ingredients FROM menu_items WHERE id = $1 AND kitchen_id = $2', [itemId, id]);
+  if (existing.rows.length === 0) {
+    return res.status(404).json({ error: 'Menu item not found' });
+  }
+  const mergedName = name !== undefined ? name : existing.rows[0].name;
+  const mergedDescription = description !== undefined ? description : existing.rows[0].description;
+  const mergedIngredients = ingredients !== undefined ? ingredients : existing.rows[0].ingredients;
+  const { category, allergens } = classifyFood(mergedName, mergedDescription, mergedIngredients);
 
   const result = await pool.query(
     `UPDATE menu_items SET
@@ -226,10 +301,12 @@ router.put('/:id/menu/:itemId', authenticate, authorize('kitchen', 'admin'), asy
       active = COALESCE($17, active),
       available_from = COALESCE($18, available_from),
       available_to = COALESCE($19, available_to),
+      category = $22,
+      allergens = $23,
       updated_at = NOW()
      WHERE id = $20 AND kitchen_id = $21
      RETURNING *`,
-    [name, description, ingredients, slots, price, cal, protein, fat, calcium, vd, b12, iron, tags, season, prepExtraMin, tier, active, availableFrom, availableTo, itemId, id]
+    [name, description, ingredients, slots, price, cal, protein, fat, calcium, vd, b12, iron, tags, season, prepExtraMin, tier, active, availableFrom, availableTo, itemId, id, category, allergens]
   );
 
   if (result.rows.length === 0) {
@@ -260,6 +337,39 @@ router.delete('/:id/menu/:itemId', authenticate, authorize('kitchen', 'admin'), 
   }
 
   res.json({ success: true, message: 'Menu item deleted' });
+}));
+
+/**
+ * POST /api/kitchens/:id/menu/:itemId/generate-photo
+ * Generate a realistic AI photo for a menu item from its name/description/ingredients/category.
+ * Requires OPENAI_API_KEY in .env — see src/services/imageGeneration.js.
+ */
+router.post('/:id/menu/:itemId/generate-photo', authenticate, authorize('kitchen', 'admin'), asyncHandler(async (req, res) => {
+  const { id, itemId } = req.params;
+
+  if (req.user.role === 'kitchen' && req.user.kitchenId !== id) {
+    return res.status(403).json({ error: 'You can only edit your own kitchen items' });
+  }
+
+  const itemResult = await pool.query(
+    'SELECT name, description, ingredients, category FROM menu_items WHERE id = $1 AND kitchen_id = $2',
+    [itemId, id]
+  );
+  if (itemResult.rows.length === 0) {
+    return res.status(404).json({ error: 'Menu item not found' });
+  }
+
+  const uploadDir = process.env.UPLOAD_DIR || 'uploads';
+  const genResult = await generateFoodImage(itemResult.rows[0], uploadDir);
+
+  if (!genResult.success) {
+    return res.status(502).json({ error: genResult.error });
+  }
+
+  const photoUrl = `/uploads/${genResult.filename}`;
+  await pool.query('UPDATE menu_items SET photo_url = $1, updated_at = NOW() WHERE id = $2', [photoUrl, itemId]);
+
+  res.json({ success: true, photoUrl });
 }));
 
 /**
@@ -333,6 +443,24 @@ router.post('/:id/menu/:itemId/photo', authenticate, authorize('kitchen', 'admin
   );
 
   res.json({ success: true, photoUrl });
+}));
+
+/**
+ * PATCH /api/kitchens/:id/toggle-active
+ * Admin: approve a pending kitchen or deactivate an existing one
+ */
+router.patch('/:id/toggle-active', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const result = await pool.query('SELECT active FROM kitchens WHERE id = $1', [id]);
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: 'Kitchen not found' });
+  }
+
+  const newActive = !result.rows[0].active;
+  await pool.query('UPDATE kitchens SET active = $1, updated_at = NOW() WHERE id = $2', [newActive, id]);
+
+  res.json({ success: true, id, active: newActive });
 }));
 
 /**

@@ -1,8 +1,3 @@
-/**
- * WebSocket Service — Real-time updates for kitchen dashboard
- * When an order is placed/updated, the kitchen dashboard receives it instantly.
- */
-
 const WebSocket = require('ws');
 
 let wss = null;
@@ -13,11 +8,11 @@ function initWebSocket(server) {
 
   wss.on('connection', (ws, req) => {
     clients.add(ws);
-    console.log(`⚡ WebSocket client connected (${clients.size} total)`);
+    console.log('WebSocket client connected (' + clients.size + ' total)');
 
     ws.on('close', () => {
       clients.delete(ws);
-      console.log(`⚡ WebSocket client disconnected (${clients.size} remaining)`);
+      console.log('WebSocket client disconnected (' + clients.size + ' remaining)');
     });
 
     ws.on('error', (err) => {
@@ -25,17 +20,13 @@ function initWebSocket(server) {
       clients.delete(ws);
     });
 
-    // Send initial connection confirmation
     ws.send(JSON.stringify({ type: 'connected', message: 'Connected to Thali Plan real-time updates' }));
   });
 
-  console.log(`⚡ WebSocket server initialized`);
+  console.log('WebSocket server initialized');
   return wss;
 }
 
-/**
- * Broadcast an event to all connected clients
- */
 function broadcast(event, data) {
   if (!wss) return;
   const message = JSON.stringify({ type: event, ...data, timestamp: new Date().toISOString() });
@@ -46,16 +37,9 @@ function broadcast(event, data) {
       sent++;
     }
   });
-  if (sent > 0) console.log(`⚡ Broadcast "${event}" to ${sent} client(s)`);
+  if (sent > 0) console.log('Broadcast "' + event + '" to ' + sent + ' client(s)');
 }
 
-/**
- * Events:
- * - order:new — new order placed
- * - order:updated — order status changed
- * - order:paid — payment received
- * - kitchen:stats — updated kitchen stats
- */
 function broadcastNewOrder(order) {
   broadcast('order:new', { order });
 }
@@ -68,10 +52,15 @@ function broadcastPayment(orderId, paid) {
   broadcast('order:paid', { orderId, paid });
 }
 
+function broadcastDeliveryLocation(orderId, lat, lng) {
+  broadcast('delivery:location', { orderId, lat, lng });
+}
+
 module.exports = {
   initWebSocket,
   broadcast,
   broadcastNewOrder,
   broadcastOrderUpdate,
   broadcastPayment,
+  broadcastDeliveryLocation,
 };

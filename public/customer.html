@@ -153,11 +153,18 @@ h1,h2,h3,.display{font-family:'Fraunces',serif}
 /* ── Modal ── */
 .modal{position:fixed;inset:0;z-index:110;display:grid;place-items:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .25s}
 .modal.show{opacity:1;pointer-events:auto}
-.modal .box{width:min(420px,100%);background:var(--bg);border-radius:var(--r-lg);padding:30px 28px;box-shadow:var(--shadow-lg);transform:translateY(16px) scale(.97);transition:transform .3s cubic-bezier(.32,.72,.31,1);border:1px solid var(--line)}
+.modal .box{width:min(420px,100%);max-height:88vh;overflow-y:auto;background:var(--bg);border-radius:var(--r-lg);padding:30px 28px;box-shadow:var(--shadow-lg);transform:translateY(16px) scale(.97);transition:transform .3s cubic-bezier(.32,.72,.31,1);border:1px solid var(--line)}
 .modal.show .box{transform:none}
 .modal h3{font-size:1.5rem;margin-bottom:6px}
 .modal .sub{color:var(--ink-2);font-size:.9rem;margin-bottom:20px}
 .field{margin-bottom:14px}
+.field-row{display:flex;gap:12px}
+.field-row .field{flex:1}
+.chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.chip-row .chip{cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:7px 14px}
+.chip-row .chip input{accent-color:var(--ink)}
+.chip-row .chip:has(input:checked){background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.match-badge{display:inline-flex;align-items:center;gap:4px;background:var(--primary);color:#1a1a1a;font-size:.72rem;font-weight:700;padding:3px 9px;border-radius:99px;margin-bottom:4px}
 .field label{display:block;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);margin-bottom:6px}
 .field input{width:100%;padding:13px 15px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-size:.95rem;outline:none;transition:border .2s,box-shadow .2s}
 .field input:focus{border-color:var(--primary);box-shadow:0 0 0 4px color-mix(in srgb,var(--primary) 14%,transparent)}
@@ -208,6 +215,7 @@ footer .logo{font-size:1.05rem}
   </div>
   <div class="nav-actions">
     <button class="icon-btn" id="themeBtn" title="Toggle theme" onclick="App.toggleTheme()">🌙</button>
+    <button class="icon-btn" id="prefsBtn" title="Nutrition preferences" onclick="location.href='complete-profile.html'" style="display:none">🥗</button>
     <button class="icon-btn" title="Cart" onclick="App.openCart()">🛒<span class="cart-badge" id="cartBadge">0</span></button>
     <button id="authBtn" class="user-chip" onclick="App.onAuthClick()"><span class="avatar" id="avatarTxt">👋</span><span id="authTxt">Sign in</span></button>
   </div>
@@ -249,6 +257,10 @@ footer .logo{font-size:1.05rem}
         <input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric">
       </div>
       <button class="primary-btn" id="verifyBtn" onclick="App.verifyOtp()">Verify &amp; continue</button>
+      <p class="sub" style="text-align:center;margin-top:10px;">
+        <a class="ghost-link" href="#" id="resendOtpLink" onclick="App.sendOtp(true);return false">Resend OTP</a>
+        <span id="resendTimer" style="display:none;">Resend in <b id="resendCountdown">4:00</b></span>
+      </p>
       <a class="ghost-link" href="#" onclick="App.backToStep1();return false">Change number</a>
     </div>
   </div>
@@ -287,6 +299,7 @@ const App = {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
     if (new URLSearchParams(location.search).get('payment') === 'success') this.toast('Payment received — thank you! 🎉');
     this.wireOtpBoxes();
+    if (!this.user) this.openAuth();
   },
 
   /* ── theme ── */
@@ -378,7 +391,7 @@ const App = {
     document.getElementById('view').innerHTML = `<div class="wrap detail-head"><div class="grid" style="margin-top:24px">${Array(4).fill('<div class="skel"><div class="sk sk-img" style="height:90px"></div><div class="sk sk-line"></div><div class="sk sk-line short"></div></div>').join('')}</div></div>`;
     window.scrollTo({top:0});
     try {
-      const res = await fetch(`${API}/kitchens/${id}`);
+      const res = await fetch(`${API}/kitchens/${id}`, this.token ? { headers: { Authorization: 'Bearer ' + this.token } } : {});
       if (!res.ok) throw new Error();
       this.kitchen = await res.json();
     } catch { this.toast('Could not load this kitchen 😞'); this.goHome(); return; }
@@ -413,6 +426,7 @@ const App = {
     grid.innerHTML = items.map((it,i) => {
       const qty = this.qtyOf(it);
       return `<div class="dish" style="animation-delay:${i*50}ms">
+        ${it.recommended?`<span class="match-badge">🎯 Recommended for you</span>`:''}
         <div class="dish-top"><div><h4>${this.esc(it.name)}</h4></div>${it.tier?`<span class="nutri"><span>✦ ${this.esc(it.tier)}</span></span>`:''}</div>
         ${it.description?`<p class="desc">${this.esc(it.description)}</p>`:''}
         <div class="nutri">${it.cal?`<span>🔥 ${it.cal} kcal</span>`:''}${it.protein?`<span>💪 ${it.protein}g protein</span>`:''}${(it.tags||[]).slice(0,2).map(t=>`<span>#${this.esc(t)}</span>`).join('')}</div>
@@ -512,9 +526,11 @@ const App = {
     if (this.user) {
       document.getElementById('authTxt').textContent = this.user.name.split(' ')[0];
       document.getElementById('avatarTxt').textContent = this.user.name.trim().charAt(0).toUpperCase();
+      document.getElementById('prefsBtn').style.display = '';
     } else {
       document.getElementById('authTxt').textContent = 'Sign in';
       document.getElementById('avatarTxt').textContent = '👋';
+      document.getElementById('prefsBtn').style.display = 'none';
     }
   },
   onAuthClick() {
@@ -527,13 +543,23 @@ const App = {
   },
   openAuth() { document.getElementById('authModal').classList.add('show'); this.backToStep1(); },
   closeAuth() { document.getElementById('authModal').classList.remove('show'); this.pendingCheckout = false; },
-  backToStep1() { document.getElementById('authStep1').style.display=''; document.getElementById('authStep2').style.display='none'; },
-  async sendOtp() {
-    const mobile = document.getElementById('inMobile').value.trim();
+  backToStep1() {
+    document.getElementById('authStep1').style.display='';
+    document.getElementById('authStep2').style.display='none';
+    clearInterval(this._resendInterval);
+    this._resendLocked = false;
+    document.getElementById('resendOtpLink').style.display = '';
+    document.getElementById('resendTimer').style.display = 'none';
+  },
+  async sendOtp(isResend) {
+    const mobile = isResend ? this._mobile : document.getElementById('inMobile').value.trim();
     const name = document.getElementById('inName').value.trim();
     const email = document.getElementById('inEmail').value.trim();
     if (!/^[6-9]\d{9}$/.test(mobile)) return this.toast('Enter a valid 10-digit mobile number');
-    const btn = document.getElementById('sendOtpBtn'); btn.disabled = true; btn.textContent = 'Sending…';
+    if (isResend && this._resendLocked) return; // cooldown still active, ignore extra clicks
+    const btn = isResend ? document.getElementById('resendOtpLink') : document.getElementById('sendOtpBtn');
+    if (isResend) { btn.style.pointerEvents = 'none'; btn.textContent = 'Sending…'; }
+    else { btn.disabled = true; btn.textContent = 'Sending…'; }
     try {
       const res = await fetch(API + '/auth/send-otp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ mobile, name, email }) });
       const data = await res.json();
@@ -542,10 +568,39 @@ const App = {
       document.getElementById('otpDest').textContent = email || mobile;
       document.getElementById('authStep1').style.display='none';
       document.getElementById('authStep2').style.display='';
+      document.querySelectorAll('#otpBoxes input').forEach(b => b.value = '');
       document.querySelector('#otpBoxes input').focus();
-      this.toast('OTP sent! 📬');
+      this.toast(isResend ? 'New OTP sent! 📬' : 'OTP sent! 📬');
+      this.startResendCooldown();
     } catch (e) { this.toast(e.message); }
-    btn.disabled = false; btn.textContent = 'Send OTP';
+    if (isResend) { btn.style.pointerEvents = ''; btn.textContent = 'Resend OTP'; }
+    else { btn.disabled = false; btn.textContent = 'Send OTP'; }
+  },
+  startResendCooldown() {
+    const COOLDOWN_SECONDS = 240; // 4 minutes
+    clearInterval(this._resendInterval);
+    this._resendLocked = true;
+    let remaining = COOLDOWN_SECONDS;
+    const link = document.getElementById('resendOtpLink');
+    const timer = document.getElementById('resendTimer');
+    const countdown = document.getElementById('resendCountdown');
+    link.style.display = 'none';
+    timer.style.display = '';
+    const tick = () => {
+      const mins = Math.floor(remaining / 60);
+      const secs = String(remaining % 60).padStart(2, '0');
+      countdown.textContent = `${mins}:${secs}`;
+      if (remaining <= 0) {
+        clearInterval(this._resendInterval);
+        this._resendLocked = false;
+        link.style.display = '';
+        timer.style.display = 'none';
+        return;
+      }
+      remaining--;
+    };
+    tick();
+    this._resendInterval = setInterval(tick, 1000);
   },
   wireOtpBoxes() {
     const boxes = [...document.querySelectorAll('#otpBoxes input')];
@@ -570,8 +625,15 @@ const App = {
       this.user = data.customer ? { name: data.customer.name, email: data.customer.email, mobile: data.customer.mobile } : { name: document.getElementById('inName').value.trim() || 'Guest', email: document.getElementById('inEmail').value.trim(), mobile: this._mobile };
       if (this.token) localStorage.setItem('tp_token', this.token);
       localStorage.setItem('tp_user', JSON.stringify(this.user));
-      this.syncAuthBtn(); this.closeAuth(); this.toast(`Welcome, ${this.user.name.split(' ')[0]}! 🙏`);
-      if (this.pendingCheckout) { this.pendingCheckout = false; this.checkout(); }
+      this.syncAuthBtn();
+      if (!data.profileComplete) {
+        window.location.href = 'complete-profile.html';
+        return;
+      } else {
+        this.closeAuth();
+        this.toast(`Welcome back, ${this.user.name.split(' ')[0]}! 🙏`);
+        if (this.pendingCheckout) { this.pendingCheckout = false; this.checkout(); }
+      }
     } catch (e) { this.toast(e.message); }
     btn.disabled = false; btn.textContent = 'Verify & continue';
   },

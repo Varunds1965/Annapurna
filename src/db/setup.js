@@ -50,6 +50,8 @@ async function setupDatabase() {
         b12 NUMERIC(10,2) DEFAULT 0,
         iron NUMERIC(10,2) DEFAULT 0,
         tags TEXT[] DEFAULT '{}',
+        category VARCHAR(50) DEFAULT 'Other',
+        allergens TEXT[] DEFAULT '{}',
         season INTEGER[] DEFAULT NULL,
         prep_extra_min INTEGER DEFAULT 0,
         tier VARCHAR(20) DEFAULT 'basic' CHECK (tier IN ('basic', 'premium')),
@@ -62,47 +64,7 @@ async function setupDatabase() {
       );
     `);
 
-    // 3. Orders table
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS orders (
-        id VARCHAR(100) PRIMARY KEY,
-        customer_name VARCHAR(200) NOT NULL,
-        customer_email VARCHAR(200),
-        customer_mobile VARCHAR(15),
-        customer_id INTEGER REFERENCES customers(id),
-        kitchen_id VARCHAR(50) REFERENCES kitchens(id),
-        items_by_meal JSONB NOT NULL DEFAULT '{}',
-        total NUMERIC(10,2) NOT NULL,
-        payment_method VARCHAR(20) DEFAULT 'cod' CHECK (payment_method IN ('upi', 'cod', 'phonepe')),
-        paid BOOLEAN DEFAULT false,
-        payment_id VARCHAR(200),
-        status VARCHAR(30) DEFAULT 'placed' CHECK (status IN ('placed', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled')),
-        placed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        confirmed_at TIMESTAMP,
-        preparing_at TIMESTAMP,
-        out_for_delivery_at TIMESTAMP,
-        delivered_at TIMESTAMP,
-        cancelled_at TIMESTAMP,
-        delivery_lat DOUBLE PRECISION,
-        delivery_lng DOUBLE PRECISION,
-        delivery_address TEXT,
-        notes TEXT,
-        calendar_event_id VARCHAR(500)
-      );
-    `);
-
-    // 4. Order status timeline
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS order_timeline (
-        id SERIAL PRIMARY KEY,
-        order_id VARCHAR(100) REFERENCES orders(id) ON DELETE CASCADE,
-        status VARCHAR(30) NOT NULL,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        note TEXT
-      );
-    `);
-
-    // 5. Customers table (enhanced)
+    // 3. Customers table (enhanced) — must exist before `orders`, which references it
     await client.query(`
       CREATE TABLE IF NOT EXISTS customers (
         id SERIAL PRIMARY KEY,
@@ -125,6 +87,47 @@ async function setupDatabase() {
         referred_by VARCHAR(20),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 4. Orders table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id VARCHAR(100) PRIMARY KEY,
+        customer_name VARCHAR(200) NOT NULL,
+        customer_email VARCHAR(200),
+        customer_mobile VARCHAR(15),
+        customer_id INTEGER REFERENCES customers(id),
+        kitchen_id VARCHAR(50) REFERENCES kitchens(id),
+        items_by_meal JSONB NOT NULL DEFAULT '{}',
+        total NUMERIC(10,2) NOT NULL,
+        payment_method VARCHAR(20) DEFAULT 'cod' CHECK (payment_method IN ('upi', 'cod', 'phonepe')),
+        paid BOOLEAN DEFAULT false,
+        payment_id VARCHAR(200),
+        status VARCHAR(30) DEFAULT 'placed' CHECK (status IN ('placed', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled')),
+        placed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        confirmed_at TIMESTAMP,
+        preparing_at TIMESTAMP,
+        out_for_delivery_at TIMESTAMP,
+        delivered_at TIMESTAMP,
+        cancelled_at TIMESTAMP,
+        delivery_lat DOUBLE PRECISION,
+        delivery_lng DOUBLE PRECISION,
+        delivery_eta TIMESTAMP,
+        delivery_address TEXT,
+        notes TEXT,
+        calendar_event_id VARCHAR(500)
+      );
+    `);
+
+    // 5. Order status timeline
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS order_timeline (
+        id SERIAL PRIMARY KEY,
+        order_id VARCHAR(100) REFERENCES orders(id) ON DELETE CASCADE,
+        status VARCHAR(30) NOT NULL,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        note TEXT
       );
     `);
 
@@ -245,6 +248,68 @@ async function setupDatabase() {
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    // 14. Delivery partners (for GPS tracking)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS delivery_partners (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(200) NOT NULL,
+        phone VARCHAR(15) UNIQUE NOT NULL,
+        password VARCHAR(200) NOT NULL,
+        vehicle_type VARCHAR(50) DEFAULT 'bike',
+        vehicle_number VARCHAR(50),
+        current_lat DOUBLE PRECISION,
+        current_lng DOUBLE PRECISION,
+        status VARCHAR(30) DEFAULT 'available' CHECK (status IN ('available', 'busy', 'offline')),
+        is_active BOOLEAN DEFAULT true,
+        earnings NUMERIC(10,2) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 15. Delivery assignments (linking partners to orders)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS delivery_assignments (
+        id SERIAL PRIMARY KEY,
+        order_id VARCHAR(100) REFERENCES orders(id) ON DELETE CASCADE,
+        partner_id INTEGER REFERENCES delivery_partners(id) ON DELETE CASCADE,
+        assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        picked_up_at TIMESTAMP,
+        delivered_at TIMESTAMP,
+        status VARCHAR(30) DEFAULT 'assigned' CHECK (status IN ('assigned', 'picked_up', 'delivered'))
+      );
+    `);
+
+    // ─── Migrations for columns added after initial release ───
+    // Safe to re-run: ADD COLUMN IF NOT EXISTS is a no-op if already present.
+    // These also matter for anyone whose `kitchens`/`orders`/etc. tables were
+    // created by an older version of this project — CREATE TABLE IF NOT EXISTS
+    // above is a no-op for a table that already exists, so a database created
+    // before a column was added would otherwise be stuck without it.
+    await client.query(`ALTER TABLE kitchens ADD COLUMN IF NOT EXISTS email VARCHAR(200) UNIQUE;`);
+    await client.query(`ALTER TABLE kitchens ADD COLUMN IF NOT EXISTS password VARCHAR(200);`);
+    await client.query(`ALTER TABLE kitchens ADD COLUMN IF NOT EXISTS phone VARCHAR(15);`);
+    await client.query(`ALTER TABLE kitchens ADD COLUMN IF NOT EXISTS rating_text VARCHAR(100) DEFAULT 'New partner';`);
+    await client.query(`ALTER TABLE kitchens ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION;`);
+    await client.query(`ALTER TABLE kitchens ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION;`);
+    await client.query(`ALTER TABLE kitchens ADD COLUMN IF NOT EXISTS address TEXT;`);
+    await client.query(`ALTER TABLE kitchens ADD COLUMN IF NOT EXISTS opening_time TIME DEFAULT '07:00';`);
+    await client.query(`ALTER TABLE kitchens ADD COLUMN IF NOT EXISTS closing_time TIME DEFAULT '22:00';`);
+    await client.query(`ALTER TABLE kitchens ADD COLUMN IF NOT EXISTS photo_url TEXT;`);
+
+    await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_eta TIMESTAMP;`);
+    await client.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT 'Other';`);
+    await client.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS allergens TEXT[] DEFAULT '{}';`);
+
+    // Allow email-only signup: mobile is no longer mandatory, as long as
+    // at least one of mobile/email is present (enforced by the CHECK below).
+    await client.query(`ALTER TABLE customers ALTER COLUMN mobile DROP NOT NULL;`);
+    const constraintCheck = await client.query(
+      `SELECT 1 FROM pg_constraint WHERE conname = 'customers_mobile_or_email_chk'`
+    );
+    if (constraintCheck.rows.length === 0) {
+      await client.query(`ALTER TABLE customers ADD CONSTRAINT customers_mobile_or_email_chk CHECK (mobile IS NOT NULL OR email IS NOT NULL);`);
+    }
 
     // Seed default kitchen
     await client.query(`

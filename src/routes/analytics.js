@@ -12,6 +12,8 @@ router.get('/:kitchenId', asyncHandler(async (req, res) => {
   const { kitchenId } = req.params;
   const days = parseInt(req.query.days || '30');
 
+  const intervalStr = `${days} days`;
+
   // Total orders, revenue, avg order value
   const summary = await pool.query(`
     SELECT 
@@ -21,8 +23,8 @@ router.get('/:kitchenId', asyncHandler(async (req, res) => {
       COUNT(*) FILTER (WHERE paid = true)::int AS paid_orders,
       COUNT(*) FILTER (WHERE status = 'delivered')::int AS delivered_orders
     FROM orders
-    WHERE kitchen_id = $1 AND placed_at >= NOW() - ($2 || ' days')::interval
-  `, [kitchenId, String(days)]);
+    WHERE kitchen_id = $1 AND placed_at >= NOW() - $2::interval
+  `, [kitchenId, intervalStr]);
 
   // Orders by day (last 14 days)
   const byDay = await pool.query(`
@@ -32,14 +34,16 @@ router.get('/:kitchenId', asyncHandler(async (req, res) => {
     GROUP BY DATE(placed_at) ORDER BY day
   `, [kitchenId]);
 
-  // Most popular items
+  // Most popular items (across every meal slot, not just Breakfast)
   const popularItems = await pool.query(`
     SELECT item->>'name' AS name, SUM((item->>'qty')::int) AS total_qty, COUNT(*) AS order_count
-    FROM orders, jsonb_array_elements(items_by_meal->'Breakfast') AS item
-    WHERE kitchen_id = $1 AND placed_at >= NOW() - ($2 || ' days')::interval
+    FROM orders,
+         jsonb_each(items_by_meal) AS meal_kv,
+         jsonb_array_elements(meal_kv.value) AS item
+    WHERE kitchen_id = $1 AND placed_at >= NOW() - $2::interval
     GROUP BY item->>'name'
     ORDER BY total_qty DESC LIMIT 10
-  `, [kitchenId, String(days)]);
+  `, [kitchenId, intervalStr]);
 
   // Status distribution
   const byStatus = await pool.query(`

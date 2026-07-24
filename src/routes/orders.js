@@ -7,6 +7,7 @@ const { asyncHandler } = require('../middleware/errorHandler');
 const { blockMealPrepSlot, updateEventStatus } = require('../services/calendar');
 const { sendOrderConfirmationEmail, sendOrderConfirmationWhatsApp, sendStatusUpdate } = require('../services/notifications');
 const { broadcastNewOrder, broadcastOrderUpdate, broadcastPayment } = require('../services/websocket');
+const { authenticate, authorize } = require('../middleware/auth');
 const { v4: uuidv4 } = require('uuid');
 
 const router = Router();
@@ -60,6 +61,44 @@ router.post('/', asyncHandler(async (req, res) => {
   broadcastNewOrder(order);
 
   res.status(201).json({ success: true, orderId });
+}));
+
+// GET ALL ORDERS ACROSS ALL KITCHENS (admin only)
+// Registered before /:kitchenId so "admin" in the path isn't swallowed as a kitchen ID
+router.get('/admin/all', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
+  const { status, kitchenId } = req.query;
+
+  let query = `SELECT * FROM orders WHERE 1=1`;
+  const params = [];
+
+  if (status) {
+    params.push(status);
+    query += ` AND status = $${params.length}`;
+  }
+  if (kitchenId) {
+    params.push(kitchenId);
+    query += ` AND kitchen_id = $${params.length}`;
+  }
+  query += ` ORDER BY placed_at DESC LIMIT 500`;
+
+  const result = await pool.query(query, params);
+
+  const formattedOrders = result.rows.map(row => ({
+    id: row.id,
+    customerName: row.customer_name,
+    customerEmail: row.customer_email,
+    customerMobile: row.customer_mobile,
+    kitchenId: row.kitchen_id,
+    itemsByMeal: row.items_by_meal,
+    total: parseFloat(row.total),
+    paymentMethod: row.payment_method,
+    paid: row.paid,
+    status: row.status,
+    placedAt: row.placed_at,
+    notes: row.notes,
+  }));
+
+  res.json(formattedOrders);
 }));
 
 // GET ORDERS BY KITCHEN

@@ -35,47 +35,63 @@
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    background: var(--cream);
     color: var(--text);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background:
-      radial-gradient(ellipse at 10% 20%, rgba(143, 168, 141, 0.08) 0%, transparent 50%),
-      radial-gradient(ellipse at 90% 80%, rgba(212, 116, 74, 0.05) 0%, transparent 50%),
-      var(--cream);
+    display: grid;
+    grid-template-columns: 42% 58%;
+  }
+  @media (max-width: 900px) {
+    body { grid-template-columns: 1fr; }
   }
   .mono { font-family: var(--font-mono); }
+
+  /* Left branding panel — full height, fixed while form scrolls on wide screens */
+  .brand-panel {
+    background: linear-gradient(160deg, var(--olive) 0%, var(--olive-dark) 55%, #3C5F32 100%);
+    color: #fff;
+    padding: 56px 48px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+    min-height: 100vh;
+  }
+  @media (max-width: 900px) { .brand-panel { min-height: auto; padding: 40px 28px; } }
+  .brand-panel::before {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(255,255,255,0.08) 0%, transparent 45%),
+      radial-gradient(circle at 85% 85%, rgba(255,255,255,0.06) 0%, transparent 50%);
+    pointer-events: none;
+  }
+  .brand-top, .brand-bottom { position: relative; z-index: 1; }
+  .brand-icon-lg { width: 52px; height: 52px; background: rgba(255,255,255,0.16); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 22px; backdrop-filter: blur(4px); }
+  .brand-panel h1 { font-family: var(--font-serif); font-size: 32px; font-weight: 700; margin: 0 0 14px; }
+  .brand-panel .tagline { font-size: 16px; opacity: 0.9; line-height: 1.6; max-width: 40ch; margin: 0; }
+  .brand-perks { list-style: none; padding: 0; margin: 36px 0 0; display: grid; gap: 18px; }
+  .brand-perks li { display: flex; gap: 14px; align-items: flex-start; font-size: 14.5px; line-height: 1.5; opacity: 0.95; }
+  .brand-perks .perk-icon { font-size: 20px; flex-shrink: 0; }
+  .brand-quote { font-size: 13px; opacity: 0.75; line-height: 1.6; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 20px; }
+
+  /* Right form panel — full height, own scroll so tall forms never feel cramped */
+  .form-panel {
+    background: var(--cream);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 56px 40px;
+  }
+  @media (max-width: 640px) { .form-panel { padding: 36px 20px; } }
   .container {
     width: 100%;
-    max-width: 480px;
-    padding: 20px;
+    max-width: 460px;
     position: relative;
     z-index: 1;
   }
-  .brand { text-align: center; margin-bottom: 28px; }
-  .brand-icon {
-    width: 56px; height: 56px;
-    background: linear-gradient(135deg, var(--olive), var(--leaf));
-    border-radius: 14px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 28px;
-    box-shadow: 0 4px 16px rgba(107, 143, 92, 0.2);
-    margin-bottom: 8px;
-  }
-  .brand h1 {
-    font-family: var(--font-serif);
-    font-size: 26px;
-    margin: 8px 0 4px;
-    color: var(--earth);
-    font-weight: 700;
-  }
-  .brand p { font-size: 13px; color: var(--text-dim); margin: 0; line-height: 1.4; }
   .card {
     background: var(--card-bg);
     border: 1px solid var(--card-border);
@@ -185,15 +201,40 @@
   .loading .spinner { display: block; }
   .loading .btn-text { display: none; }
   @media (max-width: 480px) { .container { padding: 14px; } .card { padding: 20px 18px; } }
+  .pw-wrap { position: relative; }
+  .pw-wrap input { width: 100%; padding-right: 44px; }
+  .pw-eye { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 17px; padding: 4px; line-height: 1; color: var(--text-faint); }
+  .pw-eye:hover { color: var(--text-dim); }
+  .pw-strength { margin-top: 6px; }
+  .pw-strength-bar { height: 4px; border-radius: 999px; background: var(--card-border); overflow: hidden; }
+  .pw-strength-bar span { display: block; height: 100%; width: 0%; border-radius: 999px; transition: width .2s, background .2s; }
+  .pw-strength-label { font-size: 11px; margin-top: 4px; color: var(--text-faint); }
+  .pw-reqs { list-style: none; padding: 0; margin: 6px 0 0; font-size: 11px; color: var(--text-faint); display: grid; gap: 2px; }
+  .pw-reqs li.met { color: var(--olive); }
+  .pw-reqs li::before { content: "○ "; }
+  .pw-reqs li.met::before { content: "✓ "; }
 </style>
 </head>
 <body>
-<div class="container">
-  <div class="brand">
-    <div class="brand-icon">🌿</div>
+<div class="brand-panel">
+  <div class="brand-top">
+    <div class="brand-icon-lg">🌿</div>
     <h1>Thali Plan</h1>
-    <p>Partner with us — add your kitchen and start receiving orders</p>
+    <p class="tagline">Partner with us and bring your home-cooked thalis to hungry customers nearby.</p>
+    <ul class="brand-perks">
+      <li><span class="perk-icon">📦</span><span>Manage your menu, orders, and earnings from one dashboard</span></li>
+      <li><span class="perk-icon">💳</span><span>Get paid directly via UPI — no delays, no middlemen</span></li>
+      <li><span class="perk-icon">🔔</span><span>Real-time order alerts the moment a customer checks out</span></li>
+      <li><span class="perk-icon">📈</span><span>Track daily, weekly, and monthly revenue at a glance</span></li>
+    </ul>
   </div>
+  <div class="brand-bottom">
+    <p class="brand-quote">We review every new kitchen within 24 hours. Once approved, you're visible to every customer browsing nearby.</p>
+  </div>
+</div>
+
+<div class="form-panel">
+  <div class="container">
   <div class="card">
     <h2>Register your kitchen</h2>
     <p class="sub">Fill in your details to get started. We'll review and activate your kitchen within 24 hours.</p>
@@ -208,7 +249,21 @@
     </div>
     <div class="field">
       <label>Password</label>
-      <input type="password" id="k-password" placeholder="At least 6 characters" required minlength="6">
+      <div class="pw-wrap">
+        <input type="password" id="k-password" placeholder="Create a strong password" required minlength="8" oninput="updatePasswordStrength()">
+        <button type="button" class="pw-eye" onclick="togglePw('k-password', this)" aria-label="Show password">👁</button>
+      </div>
+      <div class="pw-strength">
+        <div class="pw-strength-bar"><span id="pwStrengthBar"></span></div>
+        <div class="pw-strength-label" id="pwStrengthLabel"></div>
+      </div>
+      <ul class="pw-reqs" id="pwReqs">
+        <li data-req="len">At least 8 characters</li>
+        <li data-req="upper">One uppercase letter</li>
+        <li data-req="lower">One lowercase letter</li>
+        <li data-req="num">One number</li>
+        <li data-req="special">One special character (!@#$%^&amp;*...)</li>
+      </ul>
     </div>
     <div class="field">
       <label>Phone number</label>
@@ -255,10 +310,54 @@
       Already registered? <a href="/kitchen.html">Log in to your dashboard</a>
     </div>
   </div>
+  </div>
 </div>
 <script>
 const API_BASE = window.location.origin + '/api';
 let selectedType = 'veg';
+
+// ── Password: show/hide toggle ──
+function togglePw(inputId, btn) {
+  const input = document.getElementById(inputId);
+  const showing = input.type === 'text';
+  input.type = showing ? 'password' : 'text';
+  btn.textContent = showing ? '👁' : '🙈';
+  btn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+}
+
+// ── Password strength check (shared logic) ──
+function checkPasswordRules(pw) {
+  return {
+    len: pw.length >= 8,
+    upper: /[A-Z]/.test(pw),
+    lower: /[a-z]/.test(pw),
+    num: /[0-9]/.test(pw),
+    special: /[^A-Za-z0-9]/.test(pw),
+  };
+}
+function isStrongPassword(pw) {
+  const rules = checkPasswordRules(pw);
+  return Object.values(rules).every(Boolean);
+}
+function updatePasswordStrength() {
+  const pw = document.getElementById('k-password').value;
+  const rules = checkPasswordRules(pw);
+  const metCount = Object.values(rules).filter(Boolean).length;
+
+  document.querySelectorAll('#pwReqs li').forEach(li => {
+    li.classList.toggle('met', !!rules[li.dataset.req]);
+  });
+
+  const bar = document.getElementById('pwStrengthBar');
+  const label = document.getElementById('pwStrengthLabel');
+  const pct = (metCount / 5) * 100;
+  bar.style.width = pct + '%';
+  if (!pw) { bar.style.background = 'transparent'; label.textContent = ''; }
+  else if (metCount <= 2) { bar.style.background = '#D4744A'; label.textContent = 'Weak'; }
+  else if (metCount <= 4) { bar.style.background = '#E8A838'; label.textContent = 'Medium'; }
+  else { bar.style.background = '#6B8F5C'; label.textContent = 'Strong'; }
+}
+
 document.querySelectorAll('.type-option').forEach(opt => {
   opt.addEventListener('click', () => {
     document.querySelectorAll('.type-option').forEach(o => o.classList.remove('active'));
@@ -284,8 +383,8 @@ document.getElementById('register-btn').addEventListener('click', async () => {
     errorEl.classList.add('show');
     return;
   }
-  if (password.length < 6) {
-    errorEl.textContent = 'Password must be at least 6 characters';
+  if (!isStrongPassword(password)) {
+    errorEl.textContent = 'Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character';
     errorEl.classList.add('show');
     return;
   }

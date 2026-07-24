@@ -23,6 +23,8 @@ const kitchensRouter = require('./src/routes/kitchens');
 const analyticsRouter = require('./src/routes/analytics');
 const subscriptionsRouter = require('./src/routes/subscriptions');
 const reviewsRouter = require('./src/routes/reviews');
+const deliveryRouter = require('./src/routes/delivery');
+const couponsRouter = require('./src/routes/coupons');
 
 const app = express();
 const server = http.createServer(app);
@@ -49,6 +51,8 @@ app.use('/api/kitchens', kitchensRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/subscriptions', subscriptionsRouter);
 app.use('/api/reviews', reviewsRouter);
+app.use('/api/delivery', deliveryRouter);
+app.use('/api/coupons', couponsRouter);
 
 // Payment routes
 app.post('/api/payments/create', async (req, res) => {
@@ -95,50 +99,6 @@ app.post('/api/payments/phonepe-webhook', async (req, res) => {
     await verifyPayment(req.body.orderId, req.body.transactionId);
   }
   res.json({ success: true });
-});
-
-// Coupon validation endpoint
-app.post('/api/coupons/validate', async (req, res) => {
-  try {
-    const { code, orderTotal } = req.body;
-    if (!code) return res.status(400).json({ error: 'Coupon code required' });
-
-    const result = await pool.query(
-      `SELECT * FROM coupons WHERE code = $1 AND active = true AND (expires_at IS NULL OR expires_at > NOW()) AND used_count < usage_limit`,
-      [code.toUpperCase()]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Invalid or expired coupon' });
-    }
-
-    const coupon = result.rows[0];
-    if (parseFloat(orderTotal) < parseFloat(coupon.min_order)) {
-      return res.status(400).json({ error: `Minimum order of ₹${coupon.min_order} required` });
-    }
-
-    let discount = coupon.discount_type === 'percentage'
-      ? (parseFloat(orderTotal) * parseFloat(coupon.discount_value) / 100)
-      : parseFloat(coupon.discount_value);
-
-    if (coupon.max_discount && discount > parseFloat(coupon.max_discount)) {
-      discount = parseFloat(coupon.max_discount);
-    }
-
-    res.json({
-      success: true,
-      coupon: {
-        code: coupon.code,
-        description: coupon.description,
-        discountType: coupon.discount_type,
-        discountValue: parseFloat(coupon.discount_value),
-        discount,
-        maxDiscount: coupon.max_discount ? parseFloat(coupon.max_discount) : null,
-      },
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
 });
 
 // Health check
