@@ -14,6 +14,7 @@ const { v4: uuidv4 } = require('uuid');
 const { classifyFood } = require('../services/foodClassifier');
 const { generateFoodImage } = require('../services/imageGeneration');
 const { computeTargets, scoreItem } = require('../services/nutritionEngine');
+const { sendKitchenApprovalEmail } = require('../services/notifications');
 
 const router = Router();
 
@@ -454,13 +455,27 @@ router.post('/:id/menu/:itemId/photo', authenticate, authorize('kitchen', 'admin
 router.patch('/:id/toggle-active', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const result = await pool.query('SELECT active FROM kitchens WHERE id = $1', [id]);
+  const result = await pool.query('SELECT active, name, email FROM kitchens WHERE id = $1', [id]);
   if (result.rows.length === 0) {
     return res.status(404).json({ error: 'Kitchen not found' });
   }
 
   const newActive = !result.rows[0].active;
   await pool.query('UPDATE kitchens SET active = $1, updated_at = NOW() WHERE id = $2', [newActive, id]);
+
+  // Notify the kitchen when it is approved
+  if (newActive && result.rows[0].email && process.env.SMTP_HOST) {
+    const kitchen = result.rows[0];
+    try {
+      await sendKitchenApprovalEmail({
+        id: kitchen.id,
+        customer_name: kitchen.name,
+        customer_email: kitchen.email,
+      });
+    } catch (err) {
+      console.error('Approval email failed:', err.message);
+    }
+  }
 
   res.json({ success: true, id, active: newActive });
 }));

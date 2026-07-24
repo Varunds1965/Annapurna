@@ -285,7 +285,11 @@
     <div class="field">
       <label>Address</label>
       <textarea id="k-address" placeholder="Your kitchen address" rows="2"></textarea>
+      <button type="button" class="btn-sm" id="geolocate-btn" style="margin-top:8px;">📍 Use my current location</button>
+      <div id="geo-status" style="font-size:11px;color:var(--text-faint);margin-top:4px;"></div>
     </div>
+    <input type="hidden" id="k-lat">
+    <input type="hidden" id="k-lng">
     <div class="row2">
       <div class="field">
         <label>Opening time</label>
@@ -365,12 +369,35 @@ document.querySelectorAll('.type-option').forEach(opt => {
     selectedType = opt.dataset.type;
   });
 });
+document.getElementById('geolocate-btn').addEventListener('click', () => {
+  const statusEl = document.getElementById('geo-status');
+  statusEl.textContent = '📍 Getting location…';
+  if (!navigator.geolocation) {
+    statusEl.textContent = '❌ Geolocation is not supported by your browser';
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const { latitude, longitude } = pos.coords;
+      document.getElementById('k-lat').value = latitude;
+      document.getElementById('k-lng').value = longitude;
+      statusEl.textContent = '✅ Location captured (' + latitude.toFixed(5) + ', ' + longitude.toFixed(5) + ')';
+    },
+    (err) => {
+      statusEl.textContent = '❌ Could not get location: ' + err.message;
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+});
+
 document.getElementById('register-btn').addEventListener('click', async () => {
   const name = document.getElementById('k-name').value.trim();
   const email = document.getElementById('k-email').value.trim();
   const password = document.getElementById('k-password').value;
   const phone = document.getElementById('k-phone').value.trim();
   const address = document.getElementById('k-address').value.trim();
+  const lat = document.getElementById('k-lat').value;
+  const lng = document.getElementById('k-lng').value;
   const openingTime = document.getElementById('k-opening').value;
   const closingTime = document.getElementById('k-closing').value;
   const errorEl = document.getElementById('form-error');

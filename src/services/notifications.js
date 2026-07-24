@@ -155,6 +155,49 @@ async function sendWhatsApp(to, message) {
 }
 
 /**
+ * Send kitchen approval email with login link
+ */
+async function sendKitchenApprovalEmail(kitchen) {
+  const transport = getTransporter();
+  if (!transport || !kitchen.customer_email) return;
+
+  const loginUrl = process.env.FRONTEND_URL || 'http://localhost:3000/kitchen.html';
+
+  const mailOptions = {
+    from: `"Thali Plan" <${process.env.NOTIFICATION_EMAIL || 'noreply@thaliplan.com'}>`,
+    to: kitchen.customer_email,
+    subject: `✅ Your kitchen "${kitchen.customer_name}" is now live — Thali Plan`,
+    html: `
+      <div style="font-family: Inter, sans-serif; max-width: 540px; margin: 0 auto;">
+        <div style="background: #1E1B18; color: #F1EAE0; padding: 28px; border-radius: 12px;">
+          <h1 style="font-family: Fraunces, serif; color: #D9A441; margin: 0 0 6px;">You're live! 🎉</h1>
+          <p style="color: #B7ACA0; font-size: 14px;">Congratulations, <strong>${kitchen.customer_name}</strong>! Your kitchen has been approved and is now visible to customers.</p>
+          <hr style="border: none; border-top: 1px solid #433A32; margin: 20px 0;">
+          <p style="font-size: 13px; color: #8A7E72; font-family: 'IBM Plex Mono', monospace;">Kitchen ID: ${kitchen.id}</p>
+          <p style="color: #B7ACA0; font-size: 14px; line-height: 1.6;">
+            Log in to your dashboard to start managing orders, updating your menu, and tracking earnings.
+          </p>
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="${loginUrl}" style="background: #D9A441; color: #1E1B18; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 14px; display: inline-block;">Open Kitchen Dashboard</a>
+          </div>
+          <hr style="border: none; border-top: 1px solid #433A32; margin: 20px 0;">
+          <p style="color: #8A7E72; font-size: 12px; text-align: center;">
+            Thali Plan — Custom meals from local kitchens
+          </p>
+        </div>
+      </div>
+    `,
+  };
+
+  try {
+    await transport.sendMail(mailOptions);
+    console.log(`✓ Approval email sent to ${kitchen.customer_email}`);
+  } catch (err) {
+    console.error('Approval email failed:', err.message);
+  }
+}
+
+/**
  * Send an order confirmation via WhatsApp
  */
 async function sendOrderConfirmationWhatsApp(order) {
@@ -211,4 +254,5 @@ module.exports = {
   sendStatusUpdate,
   sendSMS,
   sendWhatsApp,
+  sendKitchenApprovalEmail,
 };

@@ -133,7 +133,7 @@
         </form>
       </div>
       <p class="small-note">Newly registered kitchens start inactive and need approval below before customers can see them.</p>
-      <table><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Status</th><th>Rating</th><th>Actions</th></tr></thead><tbody id="kitchens-list"></tbody></table>
+      <table><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Status</th><th>Contact</th><th>Rating</th><th>Actions</th></tr></thead><tbody id="kitchens-list"></tbody></table>
     </div>
     <div class="tab" id="tab-orders">
       <div class="flex" style="margin-bottom:12px;">
@@ -325,12 +325,15 @@ async function loadKitchens() {
       <td>${k.name}</td>
       <td><span class="badge ${k.type}">${k.type}</span></td>
       <td><span class="badge ${k.active ? 'active' : 'pending'}">${k.active ? 'Active' : 'Pending / Inactive'}</span></td>
+      <td>
+        <div style="font-size:12px;">${k.email ? '📧 ' + k.email + '<br>' : ''}${k.phone ? '📱 ' + k.phone + '<br>' : ''}${k.address ? '📍 ' + k.address : ''}${!k.email && !k.phone && !k.address ? '<span style="color:var(--text-faint)">—</span>' : ''}</div>
+      </td>
       <td>${k.rating_text || 'N/A'}</td>
       <td>
         <button class="btn-sm ${k.active ? 'danger' : 'success'}" onclick="toggleKitchen('${k.id}')">${k.active ? 'Deactivate' : 'Approve'}</button>
       </td>
     </tr>
-  `).join('') || '<tr><td colspan="6" class="empty">No kitchens registered</td></tr>';
+  `).join('') || '<tr><td colspan="7" class="empty">No kitchens registered</td></tr>';
 }
 
 async function toggleKitchen(id) {
