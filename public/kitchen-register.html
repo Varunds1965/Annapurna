@@ -401,19 +401,26 @@ document.getElementById('register-btn').addEventListener('click', async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, email, password, phone, type: selectedType, address, openingTime, closingTime }),
     });
-    const data = await res.json();
-    if (data.success) {
-      localStorage.setItem('tp_kitchen_token', data.token);
-      localStorage.setItem('tp_kitchen', JSON.stringify(data.kitchen));
-      successEl.classList.add('show');
-      btn.style.display = 'none';
-      setTimeout(() => { window.location.href = '/kitchen.html'; }, 2000);
-    } else {
-      errorEl.textContent = data.error || 'Registration failed';
+    let data;
+    try {
+      data = await res.json();
+    } catch (e) {
+      errorEl.textContent = 'Server error (' + res.status + ') — please try again later';
       errorEl.classList.add('show');
+      return;
     }
+    if (!res.ok || !data.success) {
+      errorEl.textContent = data.error || 'Registration failed (' + res.status + ')';
+      errorEl.classList.add('show');
+      return;
+    }
+    localStorage.setItem('tp_kitchen_token', data.token);
+    localStorage.setItem('tp_kitchen', JSON.stringify(data.kitchen));
+    successEl.classList.add('show');
+    btn.style.display = 'none';
+    setTimeout(() => { window.location.href = '/kitchen.html'; }, 2000);
   } catch (err) {
-    errorEl.textContent = 'Network error — please try again';
+    errorEl.textContent = 'Network error — ' + err.message + '. Please check your connection and try again.';
     errorEl.classList.add('show');
   } finally {
     btn.classList.remove('loading');
