@@ -301,6 +301,11 @@ async function setupDatabase() {
     await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_eta TIMESTAMP;`);
     await client.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT 'Other';`);
     await client.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS allergens TEXT[] DEFAULT '{}';`);
+    await client.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS description TEXT;`);
+    await client.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS photo_url TEXT;`);
+    await client.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS available_from TIME DEFAULT '07:00';`);
+    await client.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS available_to TIME DEFAULT '22:00';`);
+    await client.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`);
 
     // Allow email-only signup: mobile is no longer mandatory, as long as
     // at least one of mobile/email is present (enforced by the CHECK below).

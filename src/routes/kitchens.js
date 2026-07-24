@@ -183,9 +183,11 @@ router.get('/:id', optionalAuth, asyncHandler(async (req, res) => {
  */
 router.get('/:id/menu', optionalAuth, asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { tier, slot } = req.query;
+  const { tier, slot, all } = req.query;
 
-  let query = 'SELECT * FROM menu_items WHERE kitchen_id = $1 AND active = true';
+  // Kitchen owners see all items (including inactive); customers see only active
+  const isKitchenOwner = req.user && req.user.role === 'kitchen' && req.user.kitchenId === id;
+  let query = 'SELECT * FROM menu_items WHERE kitchen_id = $1' + (isKitchenOwner || all === 'true' ? '' : ' AND active = true');
   const params = [id];
 
   if (tier) {

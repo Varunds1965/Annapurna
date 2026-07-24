@@ -465,10 +465,109 @@ function initDashboard() {
   kitchenToken = getToken();
   if (!kitchenId) { document.getElementById('login-screen').style.display = 'block'; document.getElementById('dashboard').style.display = 'none'; return; }
   document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('dashboard').style.display = 'block';
   document.getElementById('kitchen-name').textContent = '· ' + (kitchen.name || 'Kitchen');
-  const banner = document.getElementById('approval-banner');
-  banner.classList.toggle('show', kitchen.active === false);
+
+  // If kitchen is not yet approved by admin, show pending-approval screen
+  if (kitchen.active === false) {
+    document.getElementById('dashboard').innerHTML = `
+      <div style="max-width:520px;margin:80px auto;text-align:center;padding:40px 24px;background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--radius);box-shadow:var(--shadow);">
+        <div style="font-size:56px;margin-bottom:16px;">⏳</div>
+        <h2 style="font-family:var(--font-serif);color:var(--earth);margin:0 0 8px;">Awaiting Approval</h2>
+        <p style="color:var(--text-dim);font-size:15px;line-height:1.6;margin:0 0 20px;">
+          Your kitchen <strong>${kitchen.name}</strong> has been registered successfully and is now
+          pending admin review. You'll be able to manage orders, menu, and earnings once approved.
+        </p>
+        <p style="color:var(--text-faint);font-size:13px;line-height:1.5;">
+          We review every new kitchen within 24 hours. You'll receive a notification once your
+          kitchen is activated.
+        </p>
+        <button onclick="localStorage.removeItem('tp_kitchen_token');localStorage.removeItem('tp_kitchen');location.reload();"
+          style="margin-top:24px;background:transparent;border:1px solid var(--terracotta);color:var(--terracotta);padding:10px 20px;border-radius:var(--radius-xs);font-size:13px;font-weight:600;cursor:pointer;">
+          Sign out
+        </button>
+      </div>`;
+    document.getElementById('dashboard').style.display = 'block';
+    return;
+  }
+
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('dashboard').innerHTML = `
+  <div class="approval-banner" id="approval-banner"></div>
+  <header class="top">
+    <div class="brand">
+      <div class="brand-icon">🌿</div>
+      <h1>Thali Plan <span id="kitchen-name">· Kitchen</span></h1>
+    </div>
+    <div class="header-right">
+      <span class="clock" id="clock"></span>
+      <span class="ws-wrap"><span class="ws-badge offline" id="ws-badge"></span><span id="ws-label">offline</span></span>
+      <button class="theme-btn" id="theme-btn" title="Toggle dark mode">🌙</button>
+      <button class="refresh-btn" id="refresh-btn">↻ Refresh</button>
+      <button class="logout-btn" id="logout-btn">Logout</button>
+    </div>
+  </header>
+  <div class="new-order-alert" id="new-order-alert">🔔 New order received!</div>
+  <div class="toast" id="toast"></div>
+  <main>
+    <div class="tabs" id="main-tabs">
+      <button class="active" data-tab="orders">Orders</button>
+      <button data-tab="menu">Menu Manager</button>
+      <button data-tab="earnings">Earnings</button>
+      <button data-tab="profile">Profile</button>
+    </div>
+    <div class="tabview active" id="tab-orders">
+      <div class="stat-row" id="order-stats"></div>
+      <div class="order-filter-tabs" id="order-filter-tabs">
+        <button class="active" data-filter="all">All</button>
+        <button data-filter="placed">New</button>
+        <button data-filter="confirmed">Confirmed</button>
+        <button data-filter="preparing">Preparing</button>
+        <button data-filter="out_for_delivery">On the way</button>
+        <button data-filter="delivered">Delivered</button>
+        <button data-filter="cancelled">Cancelled</button>
+      </div>
+      <div class="section-title">Today's orders</div>
+      <div id="orders-list"></div>
+    </div>
+    <div class="tabview" id="tab-menu">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+        <div class="section-title" style="margin:0;">Your menu items</div>
+        <button class="btn" id="add-item-btn">+ Add new item</button>
+      </div>
+      <div class="menu-grid" id="menu-grid"></div>
+    </div>
+    <div class="tabview" id="tab-earnings">
+      <div class="section-title">Earnings overview</div>
+      <div class="earnings-grid" id="earnings-grid"></div>
+      <div class="section-title">Last 14 days</div>
+      <div class="chart-card">
+        <div class="chart-bars" id="revenue-chart"></div>
+        <div class="chart-tooltip" id="chart-tooltip"></div>
+      </div>
+      <div class="section-title">Popular items</div>
+      <ul class="popular-list" id="popular-items"></ul>
+    </div>
+    <div class="tabview" id="tab-profile">
+      <div class="section-title">Kitchen profile</div>
+      <div style="max-width:480px;">
+        <div class="photo-upload-row">
+          <img class="photo-preview" id="p-photo-preview" src="" alt="">
+          <div>
+            <input type="file" id="p-photo-input" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none;">
+            <button class="btn-sm" id="p-photo-btn" type="button">📷 Change photo</button>
+          </div>
+        </div>
+        <div class="field"><label>Kitchen name</label><input type="text" id="p-name"></div>
+        <div class="field"><label>Phone</label><input type="tel" id="p-phone"></div>
+        <div class="field"><label>Address</label><textarea id="p-address" rows="2"></textarea></div>
+        <div class="row2">
+          <div class="field"><label>Opening time</label><input type="time" id="p-opening"></div>
+          <div class="field"><label>Closing time</label><input type="time" id="p-closing"></div>
+        </div>
+        <button class="btn" id="save-profile-btn">Save profile</button>
+      </div>
+    </div>
+  </main>`;
   loadOrders(); loadMenu(); loadEarnings(); loadProfile(); startClock();
   connectWS();
 }
