@@ -66,17 +66,6 @@ app.post('/api/payments/create', async (req, res) => {
   }
 });
 
-app.post('/api/payments/verify', async (req, res) => {
-  try {
-    const { verifyPayment } = require('./src/services/payment');
-    const { orderId, transactionId } = req.body;
-    const result = await verifyPayment(orderId, transactionId);
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // Payment webhook endpoint
 app.post('/api/payments/webhook', async (req, res) => {
   const { handleWebhook } = require('./src/services/payment');
@@ -99,6 +88,217 @@ app.post('/api/payments/phonepe-webhook', async (req, res) => {
     await verifyPayment(req.body.orderId, req.body.transactionId);
   }
   res.json({ success: true });
+});
+
+// Razorpay webhook
+app.post('/api/payments/razorpay-webhook', async (req, res) => {
+  const { verifyRazorpayPayment } = require('./src/services/razorpay');
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+  
+  if (razorpay_order_id && razorpay_payment_id && razorpay_signature) {
+    const result = await verifyRazorpayPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+    if (result.success) {
+      // Find order by razorpay order ID
+      const { pool } = require('./src/db/pool');
+      const orderRes = await pool.query(`SELECT id FROM orders WHERE id = $1`, [razorpay_order_id]);
+      if (orderRes.rows.length > 0) {
+        await require('./src/services/payment').verifyPayment(orderRes.rows[0].id, razorpay_payment_id);
+      }
+    }
+  }
+  res.json({ success: true });
+});
+
+// Razorpay payment verification (frontend callback)
+app.post('/api/payments/razorpay/verify', async (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId } = req.body;
+    const { verifyRazorpayPayment } = require('./src/services/razorpay');
+    const { verifyPayment } = require('./src/services/payment');
+    
+    const result = await verifyRazorpayPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+    
+    if (result.success) {
+      // Mark order as paid
+      await verifyPayment(orderId, razorpay_payment_id);
+      res.json({ success: true, message: 'Payment verified successfully', ...result });
+    } else {
+      res.status(400).json({ success: false, error: result.error });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Paytm callback
+app.post('/api/payments/paytm-callback', async (req, res) => {
+  const { verifyPaytmPayment } = require('./src/services/paytm');
+  const merchantKey = process.env.PAYTM_MERCHANT_KEY;
+  
+  const result = await verifyPaytmPayment(req.body, merchantKey);
+  if (result.success) {
+    const { orderId } = req.body;
+    const { verifyPayment } = require('./src/services/payment');
+    await verifyPayment(orderId, result.txnId);
+  }
+  
+  res.json(result);
+});
+
+// Paytm webhook
+app.post('/api/payments/paytm-webhook', async (req, res) => {
+  const { verifyPaytmPayment } = require('./src/services/paytm');
+  const merchantKey = process.env.PAYTM_MERCHANT_KEY;
+  
+  const result = await verifyPaytmPayment(req.body, merchantKey);
+  if (result.success) {
+    const { orderId } = req.body;
+    const { verifyPayment } = require('./src/services/payment');
+    await verifyPayment(orderId, result.txnId);
+  }
+  
+  res.json(result);
+});
+
+// Stripe webhook (for payment intent confirmation)
+app.post('/api/payments/stripe-webhook', async (req, res) => {
+  const event = req.body;
+  const { verifyStripePayment } = require('./src/services/stripe');
+  const { verifyPayment } = require('./src/services/payment');
+  
+  if (event.type === 'payment_intent.succeeded') {
+    const paymentIntent = event.data.object;
+    const orderId = paymentIntent.metadata?.thali_order_id;
+    const transactionId = paymentIntent.id;
+    
+    if (orderId) {
+      await verifyPayment(orderId, transactionId);
+    }
+  }
+  
+  res.json({ received: true });
+});
+
+// Create payment order (unified endpoint)
+app.post('/api/payments/create-order', async (req, res) => {
+  try {
+    const { amount, orderId, customerName, customerEmail, customerMobile, method } = req.body;
+    const { createPaymentOrder } = require('./src/services/payment');
+    
+    const result = await createPaymentOrder(amount, orderId, customerName, customerEmail, customerMobile, method);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Verify payment (unified endpoint)
+app.post('/api/payments/verify', async (req, res) => {
+  try {
+    const { method, ...paymentDetails } = req.body;
+    const { verifyPaymentByMethod } = require('./src/services/payment');
+    
+    const result = await verifyPaymentByMethod(method, paymentDetails);
+    if (result.success) {
+      res.json({ success: true, ...result });
+    } else {
+      res.status(400).json({ success: false, error: result.error });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get available payment methods
+app.get('/api/payments/methods', async (req, res) => {
+  try {
+    const { getAvailablePaymentMethods } = require('./src/services/payment');
+    const methods = getAvailablePaymentMethods();
+    res.json({ methods });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Discount engine — get best available discount
+app.post('/api/discount/calculate', async (req, res) => {
+  try {
+    const { customerId, orderTotal, couponCode } = req.body;
+    const { calculateBestDiscount } = require('./src/services/discountEngine');
+    const result = await calculateBestDiscount(customerId, orderTotal, couponCode);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Discount engine — get active offers for banners
+app.get('/api/discount/offers', async (req, res) => {
+  try {
+    const customerId = req.query.customerId ? parseInt(req.query.customerId) : null;
+    const { getActiveOffers } = require('./src/services/discountEngine');
+    const offers = await getActiveOffers(customerId);
+    res.json({ offers });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Kitchen distance & ETA
+app.get('/api/kitchens/nearby', async (req, res) => {
+  try {
+    const { lat, lng } = req.query;
+    const { pool } = require('./src/db/pool');
+    
+    let query = `SELECT id, name, type, active, rating_text, lat, lng, address, photo_url, opening_time, closing_time FROM kitchens WHERE active = true`;
+    const params = [];
+    
+    if (lat && lng) {
+      query = `SELECT id, name, type, active, rating_text, lat, lng, address, photo_url, opening_time, closing_time,
+        (6371 * acos(cos(radians($1)) * cos(radians(lat)) * cos(radians(lng) - radians($2)) + sin(radians($1)) * sin(radians(lat)))) AS distance_km
+        FROM kitchens WHERE active = true ORDER BY distance_km ASC`;
+      params.push(parseFloat(lat), parseFloat(lng));
+    } else {
+      query += ` ORDER BY name ASC`;
+    }
+    
+    const result = await pool.query(query, params);
+    const kitchens = result.rows.map(k => ({
+      ...k,
+      distance_km: k.distance_km ? parseFloat(k.distance_km.toFixed(1)) : null,
+      eta_min: k.distance_km ? Math.max(15, Math.round(k.distance_km * 3 + 10)) : null,
+    }));
+    
+    res.json(kitchens);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Reorder — repeat a previous order
+app.post('/api/orders/reorder/:orderId', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { pool } = require('./src/db/pool');
+    
+    const orderRes = await pool.query('SELECT * FROM orders WHERE id = $1', [orderId]);
+    if (orderRes.rows.length === 0) return res.status(404).json({ error: 'Order not found' });
+    
+    const order = orderRes.rows[0];
+    const { v4: uuidv4 } = require('uuid');
+    const newOrderId = `ord_${Date.now()}_${uuidv4().slice(0, 6)}`;
+    
+    await pool.query(
+      `INSERT INTO orders (id, customer_name, customer_email, customer_mobile, customer_id, kitchen_id, items_by_meal, total, payment_method, status, placed_at, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, 'placed', NOW(), $10)`,
+      [newOrderId, order.customer_name, order.customer_email, order.customer_mobile, order.customer_id,
+       order.kitchen_id, JSON.stringify(order.items_by_meal), order.total, order.payment_method, 'Reordered from #' + orderId.slice(-8)]
+    );
+    
+    res.json({ success: true, orderId: newOrderId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Health check

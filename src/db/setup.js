@@ -262,13 +262,14 @@ async function setupDatabase() {
         current_lng DOUBLE PRECISION,
         status VARCHAR(30) DEFAULT 'available' CHECK (status IN ('available', 'busy', 'offline')),
         is_active BOOLEAN DEFAULT true,
+        license_verified BOOLEAN DEFAULT false,
         earnings NUMERIC(10,2) DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
     // 15. Delivery OTPs
-    await client.query(`CREATE TABLE IF NOT EXISTS delivery_otps (id SERIAL PRIMARY KEY, order_id VARCHAR(100) REFERENCES orders(id) ON DELETE CASCADE, customer_mobile VARCHAR(15), customer_email VARCHAR(200), customer_name VARCHAR(200), otp VARCHAR(6) NOT NULL, attempts INTEGER DEFAULT 0, expires_at TIMESTAMP NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`;
+    await client.query(`CREATE TABLE IF NOT EXISTS delivery_otps (id SERIAL PRIMARY KEY, order_id VARCHAR(100) REFERENCES orders(id) ON DELETE CASCADE, customer_mobile VARCHAR(15), customer_email VARCHAR(200), customer_name VARCHAR(200), otp VARCHAR(6) NOT NULL, attempts INTEGER DEFAULT 0, expires_at TIMESTAMP NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
 
     // 16. Delivery assignments (linking partners to orders)
     await client.query(`

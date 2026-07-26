@@ -47,8 +47,32 @@ h1,h2,h3,.display{font-family:'Fraunces',serif}
 .user-chip{display:flex;align-items:center;gap:8px;padding:7px 14px 7px 8px;border-radius:99px;background:var(--surface);border:1.5px solid var(--line);font-size:.85rem;font-weight:600}
 .user-chip .avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--leaf),var(--saffron));color:#fff;display:grid;place-items:center;font-size:.75rem;font-weight:800}
 
-/* ── Hero ── */
-.hero{position:relative;overflow:hidden;padding:clamp(48px,9vw,110px) clamp(16px,4vw,48px) clamp(40px,7vw,80px);text-align:center}
+  /* ── Offer banners ── */
+  .offer-banner{width:100%;margin:18px 0;overflow:hidden;border-radius:var(--r-lg);background:linear-gradient(135deg,var(--saffron),var(--primary));color:#fff;box-shadow:var(--shadow-lg);position:relative;animation:fadeUp .5s both}
+  .offer-banner .content{padding:clamp(16px,3vw,22px) clamp(20px,4vw,28px);display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .offer-banner .emoji{font-size:1.8rem;flex:none}
+  .offer-banner .text{flex:1}
+  .offer-banner .title{font-family:'Fraunces',serif;font-size:clamp(1.1rem,2vw,1.4rem);font-weight:700}
+  .offer-banner .desc{font-size:.82rem;opacity:.9;margin-top:2px}
+  .offer-banner .action{flex:none;background:#fff;color:var(--primary);padding:8px 18px;border-radius:99px;font-weight:700;font-size:.82rem;transition:transform .15s}
+  .offer-banner .action:hover{transform:translateY(-2px)}
+  .offer-banner .close{position:absolute;top:8px;right:10px;background:none;border:none;color:rgba(255,255,255,.6);font-size:1.1rem;cursor:pointer;opacity:.7}
+  .offer-banner .close:hover{opacity:1}
+  .distance-tag{display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:600;color:var(--ink-2);background:var(--surface-2);padding:3px 8px;border-radius:6px;margin-left:8px}
+  .loyalty-badge{display:inline-flex;align-items:center;gap:3px;font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:99px;background:linear-gradient(135deg,var(--saffron),var(--primary));color:#2D1B12;margin-left:8px}
+  .order-history-item{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:12px;cursor:pointer;transition:transform .15s}
+  .order-history-item:hover{transform:translateY(-2px)}
+  .order-history-item .oh-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .order-history-item .oh-id{font-family:'IBM Plex Mono',monospace;font-size:.78rem;color:var(--ink-3)}
+  .order-history-item .oh-status{padding:3px 10px;border-radius:99px;font-size:.72rem;font-weight:700}
+  .order-history-item .oh-status.delivered{background:rgba(62,142,90,.15);color:var(--leaf)}
+  .order-history-item .oh-status.placed{background:rgba(217,164,65,.15);color:var(--primary-dark)}
+  .order-history-item .oh-items{font-size:.82rem;color:var(--ink-2);margin:6px 0}
+  .order-history-item .oh-total{font-weight:800;font-size:.95rem;margin-top:4px}
+  .order-history-item .oh-reorder{display:inline-block;margin-top:8px;font-size:.75rem;font-weight:700;color:var(--primary)}
+
+  /* ── Hero ── */
+  .hero{position:relative;overflow:hidden;padding:clamp(48px,9vw,110px) clamp(16px,4vw,48px) clamp(40px,7vw,80px);text-align:center}
 .hero::before{content:'';position:absolute;inset:-40% -20% auto;height:140%;background:radial-gradient(ellipse at 30% 20%,color-mix(in srgb,var(--saffron) 22%,transparent),transparent 55%),radial-gradient(ellipse at 75% 10%,color-mix(in srgb,var(--primary) 16%,transparent),transparent 50%);pointer-events:none}
 .hero .kicker{display:inline-flex;align-items:center;gap:8px;padding:7px 16px;border-radius:99px;background:var(--surface);border:1.5px solid var(--line);font-size:.8rem;font-weight:700;color:var(--primary);box-shadow:var(--shadow);animation:fadeUp .6s both}
 .hero h1{font-size:clamp(2.2rem,5.5vw,4rem);font-weight:700;letter-spacing:-.03em;margin:20px auto 14px;max-width:14ch;line-height:1.12;animation:fadeUp .6s .08s both}
@@ -494,13 +518,45 @@ const App = {
       <div class="coupon-row"><input id="couponIn" placeholder="COUPON CODE" value="${this.coupon?this.coupon.code:''}"><button onclick="App.applyCoupon()">Apply</button></div>
       <div id="couponMsg">${this.coupon?`<span class="coupon-ok">✓ ${this.esc(this.coupon.code)} applied — you save ₹${this.coupon.discount.toFixed(0)}</span>`:''}</div>
       <textarea class="notes-in" id="orderNotes" placeholder="Cooking notes? (less spicy, no onion…)"></textarea>
-      <div class="pay-opts">
-        <button class="pay-opt ${this.payMethod==='upi'?'active':''}" onclick="App.setPay('upi')">📱 UPI</button>
-        <button class="pay-opt ${this.payMethod==='cod'?'active':''}" onclick="App.setPay('cod')">💵 Cash on delivery</button>
+      <div class="pay-opts" id="paymentMethods">
+        <button class="pay-opt ${this.payMethod==='upi'?'active':''}" onclick="App.setPay('upi')" data-method="upi">📱 UPI</button>
+        <button class="pay-opt ${this.payMethod==='razorpay'?'active':''}" onclick="App.setPay('razorpay')" data-method="razorpay">💳 Razorpay</button>
+        <button class="pay-opt ${this.payMethod==='paytm'?'active':''}" onclick="App.setPay('paytm')" data-method="paytm">🟡 Paytm</button>
+        <button class="pay-opt ${this.payMethod==='phonepe'?'active':''}" onclick="App.setPay('phonepe')" data-method="phonepe">🔵 PhonePe</button>
+        <button class="pay-opt ${this.payMethod==='stripe'?'active':''}" onclick="App.setPay('stripe')" data-method="stripe">🌐 Stripe</button>
+        <button class="pay-opt ${this.payMethod==='cod'?'active':''}" onclick="App.setPay('cod')" data-method="cod">💵 Cash on delivery</button>
       </div>`;
     this.renderTotals();
+    App.updatePaymentMethodsVisibility();
   },
   setPay(m) { this.payMethod = m; this.renderCart(); },
+  
+  async updatePaymentMethodsVisibility() {
+    try {
+      const res = await fetch(API + '/payments/methods');
+      const data = await res.json();
+      const availableMethods = data.methods || ['upi', 'cod'];
+      
+      // Show/hide payment method buttons based on availability
+      document.querySelectorAll('#paymentMethods .pay-opt').forEach(btn => {
+        const method = btn.dataset.method;
+        if (!availableMethods.includes(method)) {
+          btn.style.display = 'none';
+        } else {
+          btn.style.display = '';
+        }
+      });
+      
+      // If current selected method is not available, switch to first available
+      if (!availableMethods.includes(this.payMethod)) {
+        this.payMethod = availableMethods[0];
+        this.renderCart();
+      }
+    } catch (e) {
+      // On error, show all methods (fallback)
+      console.error('Failed to load payment methods:', e);
+    }
+  },
   renderTotals() {
     const sub = this.subtotal(), disc = this.coupon ? Math.min(this.coupon.discount, sub) : 0;
     document.getElementById('cartTotals').innerHTML = `
@@ -659,15 +715,61 @@ const App = {
       this.activeOrder = { id: data.orderId, status: 'placed', total, kitchenName: entries[0].kitchenName };
       localStorage.setItem('tp_order', JSON.stringify(this.activeOrder));
       this.cart = {}; this.coupon = null; this.saveCart(); this.closeCart();
-      if (this.payMethod === 'upi') {
+
+      // Handle payment based on selected method
+      if (this.payMethod === 'cod') {
+        // Cash on delivery - no payment gateway needed
+        this.goHome(); window.scrollTo({top:0,behavior:'smooth'}); this.toast('Order placed! Pay on delivery 💵');
+      } else if (this.payMethod === 'upi') {
+        // UPI deep link
         try {
           const pRes = await fetch(API + '/payments/create', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ amount: total, orderId: data.orderId, customerName: this.user.name, customerMobile: this.user.mobile }) });
           const pay = await pRes.json();
-          const url = pay.redirectUrl || pay.paymentUrl || pay.url || (pay.data && pay.data.instrumentResponse && pay.data.instrumentResponse.redirectInfo && pay.data.instrumentResponse.redirectInfo.url);
+          const url = pay.redirectUrl || pay.redirect_url || pay.paymentUrl || pay.url || (pay.appLinks && (pay.appLinks.googlePay || pay.appLinks.phonePe || pay.appLinks.paytm)) || (pay.data && pay.data.instrumentResponse && pay.data.instrumentResponse.redirectInfo && pay.data.instrumentResponse.redirectInfo.url) || pay.upiLink;
           if (url) { window.location.href = url; return; }
         } catch { /* fall through to tracking */ }
+        this.goHome(); window.scrollTo({top:0,behavior:'smooth'}); this.toast('Order placed! Complete payment via UPI 📱');
+      } else if (this.payMethod === 'razorpay') {
+        // Razorpay payment
+        try {
+          await App.handleRazorpayPayment(total, data.orderId);
+          return;
+        } catch (e) {
+          this.toast(e.message || 'Payment failed. Please try again.');
+          btn.disabled = false; btn.textContent = 'Place order'; return;
+        }
+      } else if (this.payMethod === 'paytm') {
+        // Paytm payment
+        try {
+          await App.handlePaytmPayment(total, data.orderId);
+          return;
+        } catch (e) {
+          this.toast(e.message || 'Payment failed. Please try again.');
+          btn.disabled = false; btn.textContent = 'Place order'; return;
+        }
+      } else if (this.payMethod === 'stripe') {
+        // Stripe payment
+        try {
+          await App.handleStripePayment(total, data.orderId);
+          return;
+        } catch (e) {
+          this.toast(e.message || 'Payment failed. Please try again.');
+          btn.disabled = false; btn.textContent = 'Place order'; return;
+        }
+      } else if (this.payMethod === 'phonepe') {
+        // PhonePe payment
+        try {
+          const pRes = await fetch(API + '/payments/create', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ amount: total, orderId: data.orderId, customerName: this.user.name, customerMobile: this.user.mobile, method: 'phonepe' }) });
+          const pay = await pRes.json();
+          const url = pay.redirectUrl || pay.redirect_url || pay.paymentUrl || pay.url || (pay.data && pay.data.instrumentResponse && pay.data.instrumentResponse.redirectInfo && pay.data.instrumentResponse.redirectInfo.url) || pay.upiLink;
+          if (url) { window.location.href = url; return; }
+        } catch { /* fall through to tracking */ }
+        this.goHome(); window.scrollTo({top:0,behavior:'smooth'}); this.toast('Order placed! Complete payment via PhonePe 💙');
       }
-      this.goHome(); window.scrollTo({top:0,behavior:'smooth'}); this.toast('Order placed! 🎉');
+      
+      if (this.payMethod !== 'cod' && this.payMethod !== 'upi' && this.payMethod !== 'phonepe') {
+        this.goHome(); window.scrollTo({top:0,behavior:'smooth'}); this.toast('Order placed! 🎉');
+      }
     } catch (e) { this.toast(e.message); }
     btn.disabled = false; btn.textContent = 'Place order';
   },
@@ -692,6 +794,170 @@ const App = {
     el.innerHTML = STATUS_FLOW.map((s,i) => `<div class="tl-step ${i<idx?'done':i===idx?'current':''}"><div class="tl-dot">${i<idx?'✓':s.icon}</div><div><b>${s.label}</b><small>${i===idx?'Happening now':i<idx?'Done':'Up next'}</small></div></div>`).join('');
   },
   dismissOrder() { this.activeOrder = null; localStorage.removeItem('tp_order'); this.goHome(); },
+
+  // Razorpay payment handler
+  async handleRazorpayPayment(amount, orderId) {
+    const pRes = await fetch(API + '/payments/create-order', { 
+      method:'POST', 
+      headers:{'Content-Type':'application/json'}, 
+      body: JSON.stringify({ amount, orderId, customerName: this.user.name, customerEmail: this.user.email, customerMobile: this.user.mobile, method: 'razorpay' }) 
+    });
+    const pay = await pRes.json();
+    if (!pay.success) throw new Error(pay.error || 'Failed to create payment');
+    
+    // Load Razorpay script if not already loaded
+    if (!window.Razorpay) {
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+    }
+    
+    const options = {
+      key: pay.keyId,
+      amount: pay.amount,
+      currency: pay.currency,
+      name: 'Thali Plan',
+      description: `Order ${orderId}`,
+      order_id: pay.orderId,
+      prefill: {
+        name: this.user.name,
+        email: this.user.email,
+        contact: this.user.mobile,
+      },
+      handler: async (response) => {
+        try {
+          const verifyRes = await fetch(API + '/payments/razorpay/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              orderId: orderId,
+            }),
+          });
+          const data = await verifyRes.json();
+          if (data.success) {
+            this.toast('Payment successful! 🎉');
+            this.goHome(); window.scrollTo({ top: 0, behavior: 'smooth' });
+          } else {
+            throw new Error(data.error || 'Payment verification failed');
+          }
+        } catch (e) {
+          this.toast(e.message || 'Payment verification failed');
+        }
+      },
+      theme: {
+        color: '#E85D2A',
+      },
+    };
+    
+    const razorpay = new window.Razorpay(options);
+    razorpay.open();
+  },
+
+  // Paytm payment handler
+  async handlePaytmPayment(amount, orderId) {
+    const pRes = await fetch(API + '/payments/create-order', { 
+      method:'POST', 
+      headers:{'Content-Type':'application/json'}, 
+      body: JSON.stringify({ amount, orderId, customerName: this.user.name, customerEmail: this.user.email, customerMobile: this.user.mobile, method: 'paytm' }) 
+    });
+    const pay = await pRes.json();
+    if (!pay.success) throw new Error(pay.error || 'Failed to create payment');
+    
+    // Open Paytm checkout in a popup or redirect
+    const paytmUrl = `https://securegw-stage.paytm.in/theia/api/v1/initiateTransaction?mid=${pay.mid}&orderId=${pay.orderId}`;
+    const popup = window.open(paytmUrl, 'PaytmCheckout', 'width=600,height=700');
+    
+    // Poll for payment completion
+    const pollInterval = setInterval(async () => {
+      try {
+        const statusRes = await fetch(API + '/payments/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ method: 'paytm', orderId: orderId, paytmOrderId: pay.orderId }),
+        });
+        const statusData = await statusRes.json();
+        if (statusData.success) {
+          clearInterval(pollInterval);
+          popup?.close();
+          this.toast('Payment successful! 🎉');
+          this.goHome(); window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      } catch (e) {
+        // Continue polling
+      }
+      
+      if (popup?.closed) {
+        clearInterval(pollInterval);
+        // Check final status
+        setTimeout(() => {
+          this.toast('Payment window closed. Check order status.');
+          this.goHome(); window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 2000);
+      }
+    }, 3000);
+    
+    // Auto-close polling after 5 minutes
+    setTimeout(() => {
+      clearInterval(pollInterval);
+      if (!popup?.closed) popup?.close();
+    }, 5 * 60 * 1000);
+  },
+
+  // Stripe payment handler
+  async handleStripePayment(amount, orderId) {
+    const pRes = await fetch(API + '/payments/create-order', { 
+      method:'POST', 
+      headers:{'Content-Type':'application/json'}, 
+      body: JSON.stringify({ amount, orderId, customerName: this.user.name, customerEmail: this.user.email, customerMobile: this.user.mobile, method: 'stripe' }) 
+    });
+    const pay = await pRes.json();
+    if (!pay.success) throw new Error(pay.error || 'Failed to create payment');
+    
+    // Load Stripe.js if not already loaded
+    if (!window.Stripe) {
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://js.stripe.com/v3/';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+    }
+    
+    // Use the publishable key returned from the backend
+    const publishableKey = pay.publishableKey;
+    if (!publishableKey) throw new Error('Stripe publishable key not configured');
+    
+    const stripe = Stripe(publishableKey);
+    
+    // Use confirmCardPayment with the client secret from the payment intent
+    const { error } = await stripe.confirmCardPayment(pay.clientSecret);
+    
+    if (error) {
+      throw new Error(error.message);
+    }
+    
+    // Payment succeeded - verify on backend
+    const verifyRes = await fetch(API + '/payments/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ method: 'stripe', paymentIntentId: pay.paymentIntentId }),
+    });
+    const verifyData = await verifyRes.json();
+    if (verifyData.success) {
+      this.toast('Payment successful! 🎉');
+      this.goHome(); window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      throw new Error(verifyData.error || 'Payment verification failed');
+    }
+  },
 
   connectWS() {
     try {

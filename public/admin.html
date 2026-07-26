@@ -93,6 +93,7 @@
       <button data-tab="kitchens">Kitchens</button>
       <button data-tab="orders">Orders</button>
       <button data-tab="menu">Menu</button>
+      <button data-tab="delivery">Delivery</button>
       <button data-tab="coupons">Coupons</button>
     </div>
     <button class="btn-sm" id="logout-btn">Logout</button>
@@ -152,6 +153,11 @@
     <div class="tab" id="tab-menu">
       <p class="small-note">Menu items across every kitchen.</p>
       <table><thead><tr><th>Name</th><th>Kitchen</th><th>Category</th><th>Tier</th><th>Slots</th><th>Price</th><th>Allergens</th><th>Active</th></tr></thead><tbody id="menu-list"></tbody></table>
+    </div>
+    <div class="tab" id="tab-delivery">
+      <h3 style="font-family:'Fraunces',serif;margin:0 0 12px;">Delivery Partners</h3>
+      <p class="small-note">Verify delivery partner licenses before they can accept orders.</p>
+      <table><thead><tr><th>Name</th><th>Phone</th><th>Vehicle</th><th>License</th><th>Status</th><th>Earnings</th><th>Actions</th></tr></thead><tbody id="delivery-list"></tbody></table>
     </div>
     <div class="tab" id="tab-coupons">
       <div class="flex" style="margin-bottom:16px;">
@@ -280,6 +286,7 @@ document.querySelectorAll('.tabs button').forEach(btn => {
     if (btn.dataset.tab === 'kitchens') loadKitchens();
     if (btn.dataset.tab === 'orders') loadOrders();
     if (btn.dataset.tab === 'menu') loadMenu();
+    if (btn.dataset.tab === 'delivery') loadDeliveryPartners();
     if (btn.dataset.tab === 'coupons') loadCoupons();
   });
 });
@@ -428,6 +435,36 @@ async function loadMenu() {
       <td><span class="badge ${i.active ? 'active' : 'inactive'}">${i.active ? 'Yes' : 'No'}</span></td>
     </tr>
   `).join('') || '<tr><td colspan="8" class="empty">No menu items yet</td></tr>';
+}
+
+// ─── Delivery Partners ─────────────────────────────────
+async function loadDeliveryPartners() {
+  const partners = await api('/delivery/available?limit=100');
+  if (!Array.isArray(partners)) { document.getElementById('delivery-list').innerHTML = '<tr><td colspan="7" class="empty">Could not load delivery partners.</td></tr>'; return; }
+  document.getElementById('delivery-list').innerHTML = partners.map(p => `
+    <tr>
+      <td>${p.name}</td>
+      <td class="mono">${p.phone}</td>
+      <td>${p.vehicle_type} ${p.vehicle_number ? '(' + p.vehicle_number + ')' : ''}</td>
+      <td><span class="badge ${p.license_verified ? 'active' : 'pending'}">${p.license_verified ? '✅ Verified' : '⏳ Pending'}</span></td>
+      <td><span class="badge ${p.status === 'available' ? 'active' : 'inactive'}">${p.status}</span></td>
+      <td>₹${p.earnings || 0}</td>
+      <td>
+        ${!p.license_verified ? `<button class="btn-sm success" onclick="verifyLicense(${p.id})">✅ Verify License</button>` : `<span style="color:var(--curry);font-size:12px;">Verified</span>`}
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="7" class="empty">No delivery partners registered</td></tr>';
+}
+
+async function verifyLicense(partnerId) {
+  if (!confirm('Confirm this delivery partner has a valid driving license?')) return;
+  const res = await api('/delivery/verify-license/' + partnerId, { method: 'PATCH' });
+  if (res.success) {
+    showToast('License verified! Partner can now accept deliveries.');
+    loadDeliveryPartners();
+  } else {
+    showToast(res.error || 'Could not verify license', true);
+  }
 }
 
 // ─── Coupons ───────────────────────────────────────────

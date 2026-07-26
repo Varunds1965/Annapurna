@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thali Plan — Delivery Partner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#1E1B18;--panel:#28231F;--panel-2:#332C26;--line:#433A32;--accent:#D9A441;--green:#6B8F5C;--red:#C24A3B;--text:#F1EAE0;--text-dim:#B7ACA0;--text-faint:#8A7E72;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+  header h1{font-size:18px;margin:0;display:flex;align-items:center;gap:8px;}
+  .status-badge{padding:4px 12px;border-radius:999px;font-size:11px;font-family:'IBM Plex Mono',monospace;font-weight:600;}
+  .status-badge.available{background:rgba(107,143,92,0.2);color:var(--green);border:1px solid var(--green);}
+  .status-badge.busy{background:rgba(194,74,59,0.2);color:var(--red);border:1px solid var(--red);}
+  .status-badge.offline{background:rgba(138,126,114,0.2);color:var(--text-faint);border:1px solid var(--text-faint);}
+  main{max-width:800px;margin:0 auto;padding:20px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px;}
+  .card h3{margin:0 0 8px;font-size:15px;color:var(--accent);}
+  .card .info{font-size:13px;color:var(--text-dim);line-height:1.6;}
+  .card .info strong{color:var(--text);}
+  .btn{background:var(--accent);color:#1E1B18;border:none;padding:10px 20px;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;transition:all .2s;}
+  .btn:hover{opacity:.9;transform:translateY(-1px);}
+  .btn-sm{padding:6px 12px;font-size:11px;background:var(--panel-2);border:1px solid var(--line);color:var(--text-dim);border-radius:6px;cursor:pointer;}
+  .btn-sm:hover{border-color:var(--accent);color:var(--accent);}
+  .btn-sm.success{color:var(--green);border-color:var(--green);}
+  .btn-sm.danger{color:var(--red);border-color:var(--red);}
+  .empty{color:var(--text-faint);font-size:13px;padding:30px 0;text-align:center;}
+  .login-panel{max-width:360px;margin:80px auto;text-align:center;}
+  .login-panel .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:32px 24px;}
+  .login-panel h2{font-family:'Inter',serif;margin:0 0 4px;}
+  .login-panel .sub{font-size:13px;color:var(--text-faint);margin:0 0 20px;}
+  .login-panel input{width:100%;padding:12px 14px;border-radius:8px;font-size:15px;margin-bottom:12px;background:var(--panel-2);border:1px solid var(--line);color:var(--text);}
+  .login-panel button{width:100%;padding:14px;border-radius:9px;font-weight:700;font-size:15px;cursor:pointer;}
+  .toast{position:fixed;bottom:20px;right:20px;background:var(--green);color:#1E1B18;padding:12px 20px;border-radius:8px;font-weight:600;font-size:13px;z-index:300;display:none;}
+  .toast.show{display:block;}
+  .toast.error{background:var(--red);color:#fff;}
+  .otp-input{display:flex;gap:8px;justify-content:center;margin:12px 0;}
+  .otp-input input{width:40px;height:48px;text-align:center;font-size:1.2rem;font-weight:700;border-radius:8px;border:1px solid var(--line);background:var(--panel-2);color:var(--text);}
+  .otp-input input:focus{border-color:var(--accent);outline:none;}
+  .earnings{font-size:24px;font-weight:700;color:var(--accent);}
+  .flex{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .pw-wrap{position:relative;}
+  .pw-wrap input{width:100%;padding-right:40px;}
+  .pw-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;padding:4px;color:var(--text-faint);}
+</style>
+</head>
+<body>
+<div id="login-screen" class="login-panel">
+  <div class="card">
+    <h2>🛵 Delivery Partner</h2>
+    <p class="sub">Log in to see your deliveries</p>
+    <input type="tel" id="login-phone" placeholder="Phone number" maxlength="10">
+    <div class="pw-wrap">
+      <input type="password" id="login-password" placeholder="Password">
+      <button type="button" class="pw-eye" onclick="togglePw('login-password', this)">👁</button>
+    </div>
+    <button class="btn" id="login-btn" style="width:100%;">Log in</button>
+  </div>
+</div>
+
+<div id="dashboard" style="display:none;">
+  <header>
+    <h1>🛵 Thali Plan <span class="mono" style="font-size:12px;color:var(--text-faint);">delivery</span></h1>
+    <div class="flex">
+      <span class="status-badge" id="status-badge">offline</span>
+      <span class="mono" style="font-size:12px;color:var(--text-faint);" id="earnings-display">₹0</span>
+      <button class="btn-sm" id="logout-btn">Logout</button>
+    </div>
+  </header>
+  <main>
+    <div class="flex" style="margin-bottom:16px;">
+      <button class="btn-sm" id="go-online-btn">🟢 Go Online</button>
+      <button class="btn-sm danger" id="go-offline-btn">🔴 Go Offline</button>
+      <button class="btn-sm" id="refresh-btn">↻ Refresh</button>
+    </div>
+    <h3 style="margin:0 0 12px;">My Deliveries</h3>
+    <div id="assignments-list"></div>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+function togglePw(id, btn) {
+  const i = document.getElementById(id);
+  i.type = i.type === 'password' ? 'text' : 'password';
+  btn.textContent = i.type === 'password' ? '👁' : '🙈';
+}
+
+const API = window.location.origin + '/api';
+let token = localStorage.getItem('tp_delivery_token') || null;
+let partner = JSON.parse(localStorage.getItem('tp_delivery_partner') || '{}');
+let gpsInterval = null;
+
+async function api(path, opts = {}) {
+  const h = { 'Content-Type': 'application/json', ...opts.headers };
+  if (token) h['Authorization'] = 'Bearer ' + token;
+  const r = await fetch(API + path, { ...opts, headers: h });
+  return r.json();
+}
+
+function toast(msg, err) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show' + (err ? ' error' : '');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// Login
+document.getElementById('login-btn').onclick = async () => {
+  const phone = document.getElementById('login-phone').value;
+  const password = document.getElementById('login-password').value;
+  const d = await api('/delivery/login', { method:'POST', body: JSON.stringify({ phone, password }) });
+  if (d.success) {
+    token = d.token; partner = d.partner;
+    localStorage.setItem('tp_delivery_token', token);
+    localStorage.setItem('tp_delivery_partner', JSON.stringify(partner));
+    enterDashboard();
+  } else toast(d.error || 'Login failed', true);
+};
+
+function enterDashboard() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  updateStatusUI();
+  loadAssignments();
+  startGPS();
+}
+
+function updateStatusUI() {
+  const b = document.getElementById('status-badge');
+  b.textContent = partner.status || 'offline';
+  b.className = 'status-badge ' + (partner.status || 'offline');
+  document.getElementById('earnings-display').textContent = '₹' + (partner.earnings || 0);
+}
+
+document.getElementById('logout-btn').onclick = () => {
+  token = null; partner = {};
+  localStorage.removeItem('tp_delivery_token');
+  localStorage.removeItem('tp_delivery_partner');
+  if (gpsInterval) clearInterval(gpsInterval);
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'block';
+};
+
+document.getElementById('go-online-btn').onclick = async () => {
+  const d = await api('/delivery/location', { method:'PATCH', body: JSON.stringify({ status: 'available' }) });
+  if (d.success) { partner.status = 'available'; updateStatusUI(); toast('You are now online 🟢'); }
+};
+document.getElementById('go-offline-btn').onclick = async () => {
+  const d = await api('/delivery/location', { method:'PATCH', body: JSON.stringify({ status: 'offline' }) });
+  if (d.success) { partner.status = 'offline'; updateStatusUI(); toast('You are now offline 🔴'); }
+};
+document.getElementById('refresh-btn').onclick = loadAssignments;
+
+function startGPS() {
+  if (gpsInterval) clearInterval(gpsInterval);
+  gpsInterval = setInterval(() => {
+    if (navigator.geolocation && partner.status === 'available') {
+      navigator.geolocation.getCurrentPosition(pos => {
+        api('/delivery/location', { method:'PATCH', body: JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude }) });
+      }, () => {}, { enableHighAccuracy: true, timeout: 10000 });
+    }
+  }, 30000);
+  // Immediate first update
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      api('/delivery/location', { method:'PATCH', body: JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude }) });
+    }, () => {});
+  }
+}
+
+async function loadAssignments() {
+  const d = await api('/delivery/my-assignments');
+  const list = document.getElementById('assignments-list');
+  if (!Array.isArray(d) || !d.length) {
+    list.innerHTML = '<div class="empty">No active deliveries. Go online to receive orders.</div>';
+    return;
+  }
+  list.innerHTML = d.map(a => {
+    const items = a.items_by_meal ? Object.entries(a.items_by_meal).map(([m, its]) => `<div>${m}: ${its.map(i => `${i.name} ×${i.qty}`).join(', ')}</div>`).join('') : '';
+    const isPickedUp = a.status === 'picked_up';
+    return `<div class="card">
+      <div class="flex" style="justify-content:space-between;">
+        <h3>#${a.order_id.slice(-8)}</h3>
+        <span class="status-badge ${a.status}">${a.status.replace(/_/g,' ')}</span>
+      </div>
+      <div class="info">
+        <strong>${a.customer_name}</strong> · ${a.customer_mobile || 'No phone'}<br>
+        ${a.delivery_address ? '📍 ' + a.delivery_address + '<br>' : ''}
+        ₹${a.total} · ${items}
+      </div>
+      <div class="flex" style="margin-top:10px;">
+        ${!isPickedUp ? `<button class="btn-sm success" onclick="markPickup(${a.id})">📦 Mark Picked Up</button>` : ''}
+        ${isPickedUp ? `<div class="otp-input" id="otp-${a.id}">
+          <input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric">
+          <input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric">
+          <input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric">
+        </div><button class="btn-sm success" onclick="verifyOtp(${a.id})">✅ Verify OTP & Deliver</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function markPickup(assignmentId) {
+  const d = await api('/delivery/' + assignmentId + '/pickup', { method:'PATCH' });
+  if (d.success) { toast('Picked up! Enter OTP at delivery.'); loadAssignments(); }
+  else toast(d.error || 'Failed', true);
+}
+
+async function verifyOtp(assignmentId) {
+  const inputs = document.querySelectorAll('#otp-' + assignmentId + ' input');
+  const otp = Array.from(inputs).map(i => i.value).join('');
+  if (otp.length < 6) return toast('Enter the full 6-digit OTP');
+  const d = await api('/delivery/' + assignmentId + '/verify-otp', { method:'POST', body: JSON.stringify({ otp }) });
+  if (d.success) { toast('Delivered! ✅ ₹20 earned.'); loadAssignments(); }
+  else toast(d.error || 'Invalid OTP', true);
+}
+
+if (token) enterDashboard();
+</script>
+</body>
+</html>

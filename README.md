@@ -10,7 +10,7 @@
 - 👨‍🍳 **Kitchen dashboard** — self-service menu management with photo uploads, real-time order board
 - 🛡️ **Admin dashboard** — kitchen approvals, analytics, coupons
 - ⚡ **Real-time** — WebSocket broadcasts for new orders, status changes and payments
-- 💳 **Payments** — UPI via PhonePe with webhook verification, plus cash on delivery
+- 💳 **Payments** — Multiple gateways: Razorpay, PhonePe, Paytm, Stripe (international), UPI deep links, and Cash on Delivery (COD)
 - 🔔 **Notifications** — email (Nodemailer) and WhatsApp/SMS (Twilio) order updates
 - 📅 **Calendar** — Google Calendar prep-slot blocking per meal
 
@@ -27,7 +27,7 @@ Express 5 (server.js)
  ├─ /api/subscriptions  meal subscriptions
  ├─ /api/reviews        ratings & reviews
  ├─ /api/analytics      dashboards
- ├─ /api/payments       PhonePe create / verify / webhooks
+ ├─ /api/payments       Unified payments (Razorpay, PhonePe, Paytm, Stripe, UPI, COD)
  ├─ /ws                 WebSocket (live orders)
  └─ /api/health         liveness + DB check
    │
@@ -77,7 +77,11 @@ npm run dev               # http://localhost:3000
 | `DB_*` / `DATABASE_URL` | PostgreSQL connection |
 | `JWT_SECRET` | Token signing secret |
 | `CORS_ORIGIN` | Allowed origin |
-| `UPI_VPA`, PhonePe keys | Payments |
+| `UPI_VPA`, `UPI_MERCHANT_NAME` | UPI payment details |
+| `PHONEPE_MERCHANT_ID`, `PHONEPE_SALT_KEY`, `PHONEPE_SALT_INDEX` | PhonePe integration |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Razorpay integration |
+| `PAYTM_MERCHANT_ID`, `PAYTM_MERCHANT_KEY`, `PAYTM_WEBSITE` | Paytm integration |
+| `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY` | Stripe (international customers) |
 | SMTP / Twilio creds | Notifications & OTP |
 | `google-credentials.json` | Calendar integration |
 

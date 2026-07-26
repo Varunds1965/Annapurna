@@ -1,9 +1,139 @@
 /**
- * UPI Payment Integration — PhonePe + UPI Deep Links
- * Uses your PhonePe UPI ID: 917676531524@ibl
+ * Unified Payment Service
+ * Supports multiple payment methods: UPI, PhonePe, Razorpay, Paytm, Stripe, COD
  */
 const crypto = require('crypto');
 const https = require('https');
+const { createRazorpayOrder, verifyRazorpayPayment, refundRazorpayPayment } = require('./razorpay');
+const { createPaytmOrder, verifyPaytmPayment, refundPaytmPayment } = require('./paytm');
+const { createStripePaymentIntent, verifyStripePayment, refundStripePayment } = require('./stripe');
+
+// Unified payment service
+const PAYMENT_METHODS = {
+  UPI: 'upi',
+  PHONEPE: 'phonepe',
+  RAZORPAY: 'razorpay',
+  PAYTM: 'paytm',
+  STRIPE: 'stripe',
+  COD: 'cod',
+};
+
+// Auto-select best payment method based on configuration
+function getAvailablePaymentMethods() {
+  const methods = [];
+  if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+    methods.push(PAYMENT_METHODS.RAZORPAY);
+  }
+  if (process.env.STRIPE_SECRET_KEY) {
+    methods.push(PAYMENT_METHODS.STRIPE);
+  }
+  if (process.env.PAYTM_MERCHANT_ID && process.env.PAYTM_MERCHANT_KEY) {
+    methods.push(PAYMENT_METHODS.PAYTM);
+  }
+  if (process.env.PHONEPE_SALT_KEY) {
+    methods.push(PAYMENT_METHODS.PHONEPE);
+  }
+  methods.push(PAYMENT_METHODS.UPI); // UPI deep links always available
+  methods.push(PAYMENT_METHODS.COD); // COD always available
+  return methods;
+}
+
+async function createPaymentOrder(amount, orderId, customerName, customerEmail, customerMobile, preferredMethod = null) {
+  const availableMethods = getAvailablePaymentMethods();
+  let method = preferredMethod;
+
+  // If no preferred method or not available, use first available
+  if (!method || !availableMethods.includes(method)) {
+    method = availableMethods[0];
+  }
+
+  try {
+    switch (method) {
+      case PAYMENT_METHODS.RAZORPAY:
+        return await createRazorpayOrder(amount, orderId, customerName, customerEmail, customerMobile);
+
+      case PAYMENT_METHODS.PAYTM:
+        return await createPaytmOrder(amount, orderId, customerName, customerEmail, customerMobile);
+
+      case PAYMENT_METHODS.STRIPE:
+        return await createStripePaymentIntent(amount, orderId, customerName, customerEmail, customerMobile);
+
+      case PAYMENT_METHODS.PHONEPE:
+        return await createPhonePePayment(amount, orderId, customerName, customerMobile);
+
+      case PAYMENT_METHODS.UPI:
+      default:
+        const upiLink = generateUPILink(amount, orderId, customerName);
+        return {
+          success: true,
+          method: 'upi_link',
+          upiLink,
+          appLinks: generateAppLinks(amount, orderId),
+          message: 'Click the link to pay via any UPI app',
+        };
+    }
+  } catch (error) {
+    console.error(`Payment method ${method} failed:`, error.message);
+    // Fallback to UPI deep link on error
+    const upiLink = generateUPILink(amount, orderId, customerName);
+    return {
+      success: true,
+      method: 'upi_link',
+      upiLink,
+      appLinks: generateAppLinks(amount, orderId),
+      message: `Primary method failed, using UPI fallback`,
+    };
+  }
+}
+
+async function verifyPaymentByMethod(method, paymentDetails) {
+  try {
+    switch (method) {
+      case PAYMENT_METHODS.RAZORPAY:
+        return await verifyRazorpayPayment(
+          paymentDetails.razorpayOrderId,
+          paymentDetails.razorpayPaymentId,
+          paymentDetails.razorpaySignature
+        );
+
+      case PAYMENT_METHODS.PAYTM:
+        return await verifyPaytmPayment(
+          paymentDetails.paytmResponse,
+          process.env.PAYTM_MERCHANT_KEY
+        );
+
+      case PAYMENT_METHODS.STRIPE:
+        return await verifyStripePayment(paymentDetails.paymentIntentId);
+
+      case PAYMENT_METHODS.PHONEPE:
+      case PAYMENT_METHODS.COD:
+      default:
+        return verifyPayment(paymentDetails.orderId, paymentDetails.transactionId);
+    }
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+async function refundPayment(method, paymentId, orderId, amount = null) {
+  try {
+    switch (method) {
+      case PAYMENT_METHODS.RAZORPAY:
+        return await refundRazorpayPayment(paymentId, amount);
+
+      case PAYMENT_METHODS.PAYTM:
+        return await refundPaytmPayment(orderId, paymentId, amount);
+
+      case PAYMENT_METHODS.STRIPE:
+        return await refundStripePayment(paymentId, amount);
+
+      default:
+        return { success: false, error: 'Refund not supported for this method' };
+    }
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
 
 /**
  * Generate UPI deep link using your actual PhonePe UPI ID
@@ -254,10 +384,22 @@ async function checkPhonePeStatus(merchantTransactionId) {
 }
 
 module.exports = {
+  // UPI/PhonePe
   generateUPILink,
   generateAppLinks,
   createPhonePePayment,
   verifyPayment,
   handleWebhook,
   checkPhonePeStatus,
+  // Unified payment service
+  createPaymentOrder,
+  verifyPaymentByMethod,
+  refundPayment,
+  getAvailablePaymentMethods,
+  PAYMENT_METHODS,
+  
+  // Third-party integrations
+  ...require('./razorpay'),
+  ...require('./paytm'),
+  ...require('./stripe'),
 };

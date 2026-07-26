@@ -246,4 +246,124 @@ router.get('/my-assignments', authenticate, authorize('delivery'), asyncHandler(
   res.json(result.rows);
 }));
 
+// ─── Verify License (Admin) ────────────────────────────
+router.patch('/verify-license/:partnerId', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
+  const { partnerId } = req.params;
+
+  const result = await pool.query(
+    `UPDATE delivery_partners SET license_verified = true WHERE id = $1 RETURNING id, name, license_verified`,
+    [partnerId]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: 'Delivery partner not found' });
+  }
+
+  res.json({ success: true, partner: result.rows[0] });
+}));
+
+// ─── Generate Delivery OTP ──────────────────────────────
+router.post('/:assignmentId/generate-otp', authenticate, authorize('kitchen', 'admin'), asyncHandler(async (req, res) => {
+  const { assignmentId } = req.params;
+
+  // Get assignment details
+  const assignRes = await pool.query(
+    `SELECT da.order_id, da.partner_id, o.customer_mobile, o.customer_email, o.customer_name
+     FROM delivery_assignments da
+     JOIN orders o ON da.order_id = o.id
+     WHERE da.id = $1 AND da.status = 'assigned'`,
+    [assignmentId]
+  );
+  if (assignRes.rows.length === 0) return res.status(400).json({ error: 'Assignment not found or not in assigned status' });
+
+  const { order_id, customer_mobile, customer_email, customer_name } = assignRes.rows[0];
+
+  // Generate 6-digit OTP
+  const otp = String(Math.floor(100000 + Math.random() * 900000));
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
+
+  // Store OTP
+  await pool.query(
+    `INSERT INTO delivery_otps (order_id, customer_mobile, customer_email, customer_name, otp, expires_at)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (order_id) DO UPDATE SET otp = $5, expires_at = $6, attempts = 0`,
+    [order_id, customer_mobile || null, customer_email || null, customer_name || null, otp, expiresAt]
+  );
+
+  res.json({ success: true, message: 'OTP generated. Share with delivery partner.', otp });
+}));
+
+// ─── Verify Delivery OTP ────────────────────────────────
+router.post('/:assignmentId/verify-otp', authenticate, authorize('delivery'), asyncHandler(async (req, res) => {
+  const { assignmentId } = req.params;
+  const { otp } = req.body;
+
+  if (!otp) return res.status(400).json({ error: 'OTP is required' });
+
+  // Get assignment to find order_id
+  const assignRes = await pool.query(
+    `SELECT order_id, partner_id FROM delivery_assignments WHERE id = $1 AND status = 'picked_up'`,
+    [assignmentId]
+  );
+  if (assignRes.rows.length === 0) return res.status(400).json({ error: 'Assignment not found or not picked up yet' });
+
+  const { order_id, partner_id } = assignRes.rows[0];
+
+  // Verify partner owns this assignment
+  if (partner_id !== req.user.id) {
+    return res.status(403).json({ error: 'This assignment does not belong to you' });
+  }
+
+  // Get stored OTP
+  const otpRes = await pool.query(
+    `SELECT * FROM delivery_otps WHERE order_id = $1 ORDER BY created_at DESC LIMIT 1`,
+    [order_id]
+  );
+  if (otpRes.rows.length === 0) return res.status(400).json({ error: 'No OTP generated for this order' });
+
+  const stored = otpRes.rows[0];
+
+  // Check expiry
+  if (new Date() > new Date(stored.expires_at)) {
+    return res.status(400).json({ error: 'OTP has expired. Please request a new one from the kitchen.' });
+  }
+
+  // Check attempts
+  if (stored.attempts >= 3) {
+    return res.status(400).json({ error: 'Too many failed attempts. Please request a new OTP from the kitchen.' });
+  }
+
+  // Verify OTP
+  if (stored.otp !== otp) {
+    await pool.query(`UPDATE delivery_otps SET attempts = attempts + 1 WHERE id = $1`, [stored.id]);
+    return res.status(400).json({ error: 'Invalid OTP' });
+  }
+
+  // OTP verified — mark as delivered
+  const result = await pool.query(
+    `UPDATE delivery_assignments SET status = 'delivered', delivered_at = NOW() WHERE id = $1 AND status = 'picked_up' RETURNING *`,
+    [assignmentId]
+  );
+
+  if (result.rows.length === 0) return res.status(400).json({ error: 'Failed to mark as delivered' });
+
+  // Update order status
+  await pool.query(`UPDATE orders SET status = 'delivered', delivered_at = NOW() WHERE id = $1`, [order_id]);
+
+  // Mark partner as available
+  await pool.query(`UPDATE delivery_partners SET status = 'available' WHERE id = $1`, [partner_id]);
+
+  // Add earnings (₹20 per delivery)
+  await pool.query(`UPDATE delivery_partners SET earnings = COALESCE(earnings, 0) + 20 WHERE id = $1`, [partner_id]);
+
+  // Broadcast delivery complete
+  const { broadcastOrderUpdate } = require('../services/websocket');
+  broadcastOrderUpdate(order_id, 'delivered');
+
+  // Clean up OTP
+  await pool.query(`DELETE FROM delivery_otps WHERE order_id = $1`, [order_id]);
+
+  res.json({ success: true, message: 'Delivery confirmed via OTP' });
+}));
+
 module.exports = router;
