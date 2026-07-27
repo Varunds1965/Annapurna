@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thali Plan — App Launcher</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: #FFF8F0;
+      color: #1E1B18;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-family: 'Fraunces', Georgia, serif;
+      color: #E85D2A;
+      font-size: 2.2rem;
+      margin-bottom: 6px;
+    }
+    .subtitle {
+      color: #8A7E72;
+      font-size: 0.95rem;
+      margin-bottom: 28px;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #E8E2DA;
+      border-radius: 12px;
+      padding: 18px 22px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .card .info { flex: 1; }
+    .card .name {
+      font-weight: 600;
+      font-size: 1.05rem;
+      color: #1E1B18;
+    }
+    .card .desc {
+      font-size: 0.82rem;
+      color: #8A7E72;
+      margin-top: 2px;
+    }
+    .card a {
+      background: #E85D2A;
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.9rem;
+      white-space: nowrap;
+    }
+    .card a:hover { background: #c94d1f; }
+    .url {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.78rem;
+      color: #B7ACA0;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🍛 Thali Plan</h1>
+    <p class="subtitle">Open any page below in your browser</p>
+
+    <div class="card">
+      <div class="info">
+        <div class="name">Customer App</div>
+        <div class="desc">Order meals from local kitchens</div>
+        <div class="url">/customer.html</div>
+      </div>
+      <a href="/customer.html">Open</a>
+    </div>
+
+    <div class="card">
+      <div class="info">
+        <div class="name">Kitchen Dashboard</div>
+        <div class="desc">Manage orders and menu</div>
+        <div class="url">/kitchen.html</div>
+      </div>
+      <a href="/kitchen.html">Open</a>
+    </div>
+
+    <div class="card">
+      <div class="info">
+        <div class="name">Admin Panel</div>
+        <div class="desc">Approve kitchens, view analytics</div>
+        <div class="url">/admin.html</div>
+      </div>
+      <a href="/admin.html">Open</a>
+    </div>
+
+    <div class="card">
+      <div class="info">
+        <div class="name">Delivery Partner</div>
+        <div class="desc">Delivery tracking and updates</div>
+        <div class="url">/delivery.html</div>
+      </div>
+      <a href="/delivery.html">Open</a>
+    </div>
+
+    <div class="card">
+      <div class="info">
+        <div class="name">Kitchen Registration</div>
+        <div class="desc">Register a new kitchen</div>
+        <div class="url">/kitchen-register.html</div>
+      </div>
+      <a href="/kitchen-register.html">Open</a>
+    </div>
+
+    <div class="card"></div>
+  </div>
+</body>
+</html>
