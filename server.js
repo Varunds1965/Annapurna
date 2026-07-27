@@ -160,25 +160,44 @@ app.post('/api/payments/paytm-webhook', async (req, res) => {
   res.json(result);
 });
 
-// Stripe webhook (for payment intent confirmation)
-app.post('/api/payments/stripe-webhook', async (req, res) => {
-  const event = req.body;
-  const { verifyStripePayment } = require('./src/services/stripe');
+// Stripe webhook — FIXED: signature verification
+app.post('/api/payments/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!endpointSecret) {
+    console.warn('STRIPE_WEBHOOK_SECRET not set — skipping signature verification');
+    return res.status(400).json({ error: 'Webhook not configured' });
+  }
+
+  // Verify signature
+  const crypto = require('crypto');
+  const payload = req.body;
+  const elements = sig.split(',');
+  const timestamp = elements.find(e => e.startsWith('t='))?.split('=')[1];
+  const signature = elements.find(e => e.startsWith('v1='))?.split('=')[1];
+
+  const signedPayload = `${timestamp}.${payload}`;
+  const expectedSignature = crypto
+    .createHmac('sha256', endpointSecret)
+    .update(signedPayload)
+    .digest('hex');
+
+  if (signature !== expectedSignature) {
+    return res.status(400).json({ error: 'Invalid signature' });
+  }
+
+  const event = JSON.parse(payload);
   const { verifyPayment } = require('./src/services/payment');
-  
+
   if (event.type === 'payment_intent.succeeded') {
     const paymentIntent = event.data.object;
     const orderId = paymentIntent.metadata?.thali_order_id;
-    const transactionId = paymentIntent.id;
-    
-    if (orderId) {
-      await verifyPayment(orderId, transactionId);
-    }
+    if (orderId) await verifyPayment(orderId, paymentIntent.id);
   }
-  
+
   res.json({ received: true });
 });
-
 // Create payment order (unified endpoint)
 app.post('/api/payments/create-order', async (req, res) => {
   try {
@@ -362,7 +381,7 @@ server.listen(PORT, HOST, () => {
 ║──────────────────────────────────────────║
 ║  DB:       ${process.env.DB_NAME || 'thaliplan'}                    ║
 ║  Node:     ${process.version}                         ║
-║  UPI:      ${process.env.UPI_VPA || '917676531524@ibl'}          ║
+║  UPI:      ${process.env.UPI_VPA || 'not configured'}          ║
 ╚══════════════════════════════════════════╝
   `);
 });
@@ -381,3 +400,19 @@ async function gracefulShutdown() {
 }
 
 module.exports = { app, server };
+// Loyalty points
+app.get('/api/loyalty/balance', authenticate, authorize('customer'), async (req, res) => {
+  const { getBalance, getHistory } = require('./src/services/loyalty');
+  const balance = await getBalance(req.user.id);
+  const history = await getHistory(req.user.id);
+  res.json({ balance, history });
+});
+
+app.post('/api/loyalty/redeem', authenticate, authorize('customer'), async (req, res) => {
+  const { redeemPoints } = require('./src/services/loyalty');
+  const { points } = req.body;
+  if (!points || points <= 0) return res.status(400).json({ error: 'points must be positive' });
+  const result = await redeemPoints(req.user.id, points);
+  if (!result.success) return res.status(400).json(result);
+  res.json(result);
+});

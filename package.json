@@ -1,42 +1,11 @@
-{
-  "name": "thali-plan",
-  "version": "2.0.0",
-  "description": "Thali Plan — Smart meal planning & kitchen management platform",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
-    "setup-db": "node src/db/setup.js",
-    "seed": "node src/db/seed.js",
-    "test": "node --test tests/*.test.js"
-  },
-  "keywords": [
-    "thali",
-    "meal-plan",
-    "kitchen",
-    "food-delivery"
-  ],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "dependencies": {
-    "bcryptjs": "^3.0.3",
-    "cors": "^2.8.6",
-    "dotenv": "^16.4.5",
-    "express": "^5.2.1",
-    "express-rate-limit": "^8.6.0",
-    "helmet": "^7.1.0",
-    "jsonwebtoken": "^9.0.3",
-    "morgan": "^1.10.0",
-    "multer": "^2.2.0",
-    "nodemailer": "^6.9.14",
-    "pg": "^8.22.0",
-    "sharp": "^0.35.3",
-    "twilio": "^5.3.1",
-    "uuid": "^10.0.0",
-    "ws": "^8.18.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.4"
-  }
+"scripts": {
+  "start": "node server.js",
+  "dev": "node --watch server.js",
+  "setup-db": "node src/db/setup.js",
+  "seed": "node src/db/seed.js",
+  "test": "node --test tests/*.test.js",
+  "test:watch": "node --test --watch tests/*.test.js",
+  "cron:subscriptions": "node src/services/subscriptionCron.js",
+  "lint": "npx eslint src/ tests/ server.js",
+  "validate-env": "node scripts/validate-env.js"
 }

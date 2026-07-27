@@ -139,7 +139,7 @@ async function refundPayment(method, paymentId, orderId, amount = null) {
  * Generate UPI deep link using your actual PhonePe UPI ID
  */
 function generateUPILink(amount, orderId, customerName) {
-  const vpa = process.env.UPI_VPA || '917676531524@ibl';
+  const vpa = process.env.UPI_VPA;
   const merchantName = encodeURIComponent(process.env.UPI_MERCHANT_NAME || 'ThaliPlan');
   const tn = encodeURIComponent(`ThaliPlan Order ${orderId}`);
   
@@ -152,7 +152,7 @@ function generateUPILink(amount, orderId, customerName) {
  * Generate app-specific payment links
  */
 function generateAppLinks(amount, orderId) {
-  const vpa = process.env.UPI_VPA || '917676531524@ibl';
+  const vpa = process.env.UPI_VPA;
   const baseURI = `upi://pay?pa=${vpa}&pn=ThaliPlan&am=${amount}&cu=INR&tr=${orderId}&tn=Order%20${orderId}`;
 
   return {

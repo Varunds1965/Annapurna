@@ -1,21 +1,19 @@
 /**
  * JWT Authentication Middleware
- * Verifies tokens for customers, kitchens, and admin
+ * FIXED: No fallback secret — app refuses to start without one
  */
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'thaliplan_jwt_secret_key_change_in_production_2024';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+  console.error('FATAL: JWT_SECRET must be set in .env (minimum 32 characters)');
+  process.exit(1);
+}
 
-/**
- * Generate JWT token
- */
 function generateToken(payload, expiresIn) {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: expiresIn || '7d' });
 }
 
-/**
- * Verify JWT token
- */
 function verifyToken(token) {
   try {
     return jwt.verify(token, JWT_SECRET);
@@ -24,9 +22,6 @@ function verifyToken(token) {
   }
 }
 
-/**
- * Middleware: Authenticate any user (customer, kitchen, admin)
- */
 function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -43,9 +38,6 @@ function authenticate(req, res, next) {
   next();
 }
 
-/**
- * Middleware: Restrict to specific roles
- */
 function authorize(...roles) {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
@@ -55,9 +47,6 @@ function authorize(...roles) {
   };
 }
 
-/**
- * Middleware: Optional auth (doesn't fail if no token)
- */
 function optionalAuth(req, res, next) {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
