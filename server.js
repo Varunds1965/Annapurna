@@ -15,6 +15,7 @@ const fs = require('fs');
 const { pool } = require('./src/db/pool');
 const { errorHandler } = require('./src/middleware/errorHandler');
 const { initWebSocket } = require('./src/services/websocket');
+const { authenticate, authorize } = require('./src/middleware/auth');
 
 // Route imports
 const authRouter = require('./src/routes/auth');
@@ -30,11 +31,35 @@ const app = express();
 const server = http.createServer(app);
 
 // ─── Middleware ──────────────────────────────────────────
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://checkout.razorpay.com", "https://js.stripe.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      connectSrc: ["'self'", "wss:", "ws:", "https://api.razorpay.com", "https://api.stripe.com"],
+      frameSrc: ["https://api.razorpay.com", "https://js.stripe.com"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+}));
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*', credentials: true }));
 app.use(morgan('dev'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Additional security headers
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self)');
+  next();
+});
 
 // ─── Static Files ──────────────────────────────────────
 app.use(express.static(path.join(__dirname, 'public')));
@@ -415,4 +440,45 @@ app.post('/api/loyalty/redeem', authenticate, authorize('customer'), async (req,
   const result = await redeemPoints(req.user.id, points);
   if (!result.success) return res.status(400).json(result);
   res.json(result);
+});
+
+// ─── Referral System ────────────────────────────────────
+// Apply referral code
+app.post('/api/referral/apply', authenticate, authorize('customer'), async (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'Referral code required' });
+  const { pool } = require('./src/db/pool');
+  const { earnPoints } = require('./src/services/loyalty');
+  // Check if customer already used a referral
+  const customer = await pool.query('SELECT id, referred_by FROM customers WHERE id = $1', [req.user.id]);
+  if (customer.rows[0]?.referred_by) {
+    return res.status(400).json({ error: 'You have already used a referral code' });
+  }
+  // Find referrer
+  const referrer = await pool.query('SELECT id, name FROM customers WHERE referral_code = $1', [code.toUpperCase()]);
+  if (referrer.rows.length === 0) {
+    return res.status(404).json({ error: 'Invalid referral code' });
+  }
+  if (referrer.rows[0].id === req.user.id) {
+    return res.status(400).json({ error: 'You cannot refer yourself' });
+  }
+  // Apply referral
+  await pool.query('UPDATE customers SET referred_by = $1 WHERE id = $2', [code.toUpperCase(), req.user.id]);
+  // Reward both: 50 points each
+  await earnPoints(req.user.id, null, 500);
+  await earnPoints(referrer.rows[0].id, null, 500);
+  res.json({ success: true, message: `Referral applied! You and ${referrer.rows[0].name} both earned 50 bonus points.` });
+});
+
+// Get referral info
+app.get('/api/referral/info', authenticate, authorize('customer'), async (req, res) => {
+  const { pool } = require('./src/db/pool');
+  const result = await pool.query('SELECT referral_code, referred_by FROM customers WHERE id = $1', [req.user.id]);
+  if (result.rows.length === 0) return res.status(404).json({ error: 'Customer not found' });
+  const referralCount = await pool.query('SELECT COUNT(*)::int as count FROM customers WHERE referred_by = $1', [result.rows[0].referral_code]);
+  res.json({
+    referralCode: result.rows[0].referral_code,
+    referredBy: result.rows[0].referred_by,
+    totalReferred: referralCount.rows[0].count,
+  });
 });

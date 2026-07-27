@@ -114,6 +114,10 @@ router.post('/verify-otp', asyncHandler(async (req, res) => {
       [stored.name || 'Guest', channel === 'email' ? identifier : null, channel === 'mobile' ? identifier : null]
     );
     customer = newResult.rows[0];
+    // Generate referral code for new customers
+    const referralCode = `TP${customer.id}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    await pool.query('UPDATE customers SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL', [referralCode, customer.id]);
+    customer.referral_code = referralCode;
   } else {
     customer = customerResult.rows[0];
     if (stored.name && stored.name !== customer.name) {

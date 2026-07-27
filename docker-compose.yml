@@ -1,69 +1,65 @@
 version: '3.8'
 
 services:
+  app:
+    build: .
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD}@db:5432/${DB_NAME:-thaliplan}
+      - JWT_SECRET=${JWT_SECRET}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - UPI_VPA=${UPI_VPA}
+      - UPI_MERCHANT_NAME=${UPI_MERCHANT_NAME:-ThaliPlan}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-Varun121@}
-      POSTGRES_DB: thaliplan
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${DB_NAME:-thaliplan}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
       interval: 10s
       timeout: 5s
       retries: 5
-
-  app:
-    build: .
-    environment:
-      NODE_ENV: production
-      PORT: 3000
-      HOST: 0.0.0.0
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: thaliplan
-      DB_USER: postgres
-      DB_PASSWORD: ${DB_PASSWORD:-Varun121@}
-      CORS_ORIGIN: '*'
-    ports:
-      - "3000:3000"
-    depends_on:
-      db:
-        condition: service_healthy
-    # No external credentials needed — calendar is self-contained in DB
     restart: unless-stopped
 
-  setup:
+  # Optional: Subscription cron job
+  cron:
     build: .
+    command: ["node", "src/services/subscriptionCron.js"]
     environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: thaliplan
-      DB_USER: postgres
-      DB_PASSWORD: ${DB_PASSWORD:-Varun121@}
-    command: node src/db/setup.js
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD}@db:5432/${DB_NAME:-thaliplan}
     depends_on:
       db:
         condition: service_healthy
-    restart: "no"
-
-  seed:
-    build: .
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: thaliplan
-      DB_USER: postgres
-      DB_PASSWORD: ${DB_PASSWORD:-Varun121@}
-    command: node src/db/seed.js
-    depends_on:
-      setup:
-        condition: service_completed_successfully
-    restart: "no"
 
 volumes:
   pgdata:
+  uploads:

@@ -1,10 +1,33 @@
+# Dependencies
 node_modules/
+
+# Environment & secrets
 .env
+.env.local
+.env.production
 google-credentials.json
-*.log
-*.out
-*.err
-tmp_*
-.DS_Store
+
+# Uploads (user-generated content)
+uploads/
+
+# Build artifacts
 dist/
-build/
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+.docker/
+
+# Test coverage
+coverage/
+.nyc_output/

@@ -73,6 +73,13 @@ async function sendOrderConfirmationEmail(order) {
     from: `"Thali Plan" <${process.env.NOTIFICATION_EMAIL || 'noreply@thaliplan.com'}>`,
     to: n.customer_email,
     subject: `🧆 Order Confirmed #${n.id.slice(-8)} — Thali Plan`,
+    // Plain text fallback (prevents spam filter flags)
+    text: `Order Confirmed!
+Thanks ${n.customer_name}! Your kitchen is preparing your meal.
+Order #${n.id.slice(-8)}
+Total: ₹${n.total}
+Payment: ${n.payment_method === 'upi' ? 'Paid via UPI' : 'Cash on delivery'}
+- Thali Plan`,
     html: `
       <div style="font-family: Inter, sans-serif; max-width: 540px; margin: 0 auto;">
         <div style="background: #1E1B18; color: #F1EAE0; padding: 28px; border-radius: 12px;">
