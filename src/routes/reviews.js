@@ -1,15 +1,16 @@
 /**
- * Reviews API — Item ratings, photo reviews, and feedback
+ * Reviews API — FIXED: removed misplaced delivery endpoints, added auth
  */
 const { Router } = require('express');
 const { pool } = require('../db/pool');
 const { asyncHandler } = require('../middleware/errorHandler');
+const { authenticate, authorize, optionalAuth } = require('../middleware/auth');
 
 const router = Router();
 
-// SUBMIT A REVIEW
-router.post('/', asyncHandler(async (req, res) => {
-  const { orderId, customerName, itemName, rating, comment, photoUrl, kitchenId } = req.body;
+// SUBMIT A REVIEW — requires customer auth
+router.post('/', authenticate, authorize('customer'), asyncHandler(async (req, res) => {
+  const { orderId, itemName, rating, comment, photoUrl, kitchenId } = req.body;
 
   if (!orderId || !itemName || !rating) {
     return res.status(400).json({ error: 'orderId, itemName, and rating are required' });
@@ -18,10 +19,17 @@ router.post('/', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Rating must be between 1 and 5' });
   }
 
+  // Verify customer placed this order
+  const orderCheck = await pool.query('SELECT customer_id FROM orders WHERE id = $1', [orderId]);
+  if (orderCheck.rows.length === 0) return res.status(404).json({ error: 'Order not found' });
+  if (orderCheck.rows[0].customer_id !== req.user.id) {
+    return res.status(403).json({ error: 'You can only review your own orders' });
+  }
+
   const result = await pool.query(
-    `INSERT INTO item_reviews (order_id, customer_name, item_name, rating, comment, photo_url, kitchen_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-    [orderId, customerName || 'Anonymous', itemName, rating, comment || null, photoUrl || null, kitchenId || null]
+    `INSERT INTO item_reviews (order_id, customer_id, customer_name, item_name, rating, comment, photo_url, kitchen_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+    [orderId, req.user.id, req.user.name || 'Customer', itemName, rating, comment || null, photoUrl || null, kitchenId || null]
   );
 
   res.status(201).json({ success: true, review: result.rows[0] });
@@ -61,29 +69,6 @@ router.get('/kitchen/:kitchenId', asyncHandler(async (req, res) => {
     [kitchenId]
   );
   res.json(result.rows);
-}));
-
-// GET DELIVERY LOCATION (for GPS tracking)
-router.get('/delivery/:orderId', asyncHandler(async (req, res) => {
-  const { orderId } = req.params;
-  const result = await pool.query(
-    `SELECT id, customer_name, delivery_lat, delivery_lng, delivery_eta 
-     FROM orders WHERE id = $1`,
-    [orderId]
-  );
-  if (result.rows.length === 0) return res.status(404).json({ error: 'Order not found' });
-  res.json(result.rows[0]);
-}));
-
-// UPDATE DELIVERY LOCATION (called by delivery person)
-router.patch('/delivery/:orderId/location', asyncHandler(async (req, res) => {
-  const { orderId } = req.params;
-  const { lat, lng, eta } = req.body;
-  await pool.query(
-    `UPDATE orders SET delivery_lat = $1, delivery_lng = $2, delivery_eta = $3 WHERE id = $4`,
-    [lat || null, lng || null, eta || null, orderId]
-  );
-  res.json({ success: true });
 }));
 
 module.exports = router;
