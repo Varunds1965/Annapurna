@@ -1,11 +1,40 @@
-"scripts": {
-  "start": "node server.js",
-  "dev": "node --watch server.js",
-  "setup-db": "node src/db/setup.js",
-  "seed": "node src/db/seed.js",
-  "test": "node --test tests/*.test.js",
-  "test:watch": "node --test --watch tests/*.test.js",
-  "cron:subscriptions": "node src/services/subscriptionCron.js",
-  "lint": "npx eslint src/ tests/ server.js",
-  "validate-env": "node scripts/validate-env.js"
+{
+  "name": "thali-plan",
+  "version": "1.0.0",
+  "description": "AI-powered nutrition-based meal ordering platform",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "setup-db": "node src/db/setup.js",
+    "seed": "node src/db/seed.js",
+    "test": "node --test tests/*.test.js",
+    "test:watch": "node --test --watch tests/*.test.js",
+    "cron:subscriptions": "node src/services/subscriptionCron.js",
+    "lint": "npx eslint src/ tests/ server.js",
+    "validate-env": "node scripts/validate-env.js"
+  },
+  "keywords": ["food", "meal-planning", "nutrition", "thali"],
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.4",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.9.7",
+    "pg": "^8.11.3",
+    "uuid": "^9.0.0",
+    "twilio": "^4.20.0",
+    "sharp": "^0.33.2",
+    "node-cron": "^3.0.3",
+    "googleapis": "^128.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.56.0"
+  }
 }
