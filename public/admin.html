@@ -70,19 +70,17 @@
   .pw-reqs li::before { content: "○ "; }
   .pw-reqs li.met::before { content: "✓ "; }
 </style>
-<link rel="stylesheet" href="/color-ui.css">
-<link rel="stylesheet" href="/v3-ui.css">
-
-<script defer src="/color-ui.js"></script>
+<link rel="stylesheet" href="/annapurna-ui.css">
+<script defer src="/annapurna-ui.js"></script>
 </head>
 <body>
 <div id="login-screen" class="login-panel">
   <div class="card">
     <h2>🛠 Admin Login</h2>
     <p class="sub">Enter your admin credentials</p>
-    <input type="email" id="login-email" placeholder="Admin email">
+    <input type="email" id="login-email" placeholder="Admin email" autocomplete="username">
     <div class="pw-wrap">
-      <input type="password" id="login-password" placeholder="Password">
+      <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
       <button type="button" class="pw-eye" onclick="togglePw('login-password', this)" aria-label="Show password">👁</button>
     </div>
     <button class="btn" id="login-btn" style="width:100%;">Log in</button>
@@ -119,7 +117,7 @@
           <label>Email <input type="email" id="k-email" placeholder="kitchen@example.com"></label>
           <label>Temporary password</label>
           <div class="pw-wrap">
-            <input type="password" id="k-password" placeholder="Set a temporary password" required minlength="8" oninput="updateAdminPwStrength()">
+            <input type="password" id="k-password" placeholder="Set a temporary password" required minlength="8" autocomplete="new-password" oninput="updateAdminPwStrength()">
             <button type="button" class="pw-eye" onclick="togglePw('k-password', this)" aria-label="Show password">👁</button>
           </div>
           <div class="pw-strength-bar"><span id="kPwStrengthBar"></span></div>
@@ -189,6 +187,36 @@
 const API_BASE = window.location.origin + '/api';
 let adminToken = localStorage.getItem('tp_admin_token') || null;
 let kitchensCache = [];
+
+// ── Output escaping ────────────────────────────────────
+// Every value below comes from the database, and kitchen names, customer
+// names, addresses and coupon codes are all attacker-controllable via public
+// registration and checkout. Interpolating them raw into innerHTML made this
+// dashboard a stored-XSS sink that runs with the admin's tp_admin_token in
+// localStorage. Nothing reaches innerHTML without passing through esc().
+const ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ESCAPES[char]);
+
+// Values that land inside a class attribute get stripped to a safe charset.
+const cls = (value) => String(value ?? '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
+
+// Numeric formatting that never prints "NaN" or "undefined".
+const num = (value, digits = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed.toFixed(digits) : (0).toFixed(digits);
+};
+
+const shortId = (value) => esc(String(value ?? '').slice(-8));
+
+const when = (value, style = 'datetime') => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return esc(style === 'date'
+    ? date.toLocaleDateString('en-IN')
+    : date.toLocaleString('en-IN'));
+};
+
+const row = (colspan, message) => `<tr><td colspan="${colspan}" class="empty">${esc(message)}</td></tr>`;
 
 // ── Password: show/hide toggle ──
 function togglePw(inputId, btn) {
@@ -295,13 +323,26 @@ document.querySelectorAll('.tabs button').forEach(btn => {
   });
 });
 
+// ─── Row actions ───────────────────────────────────────
+// Delegated instead of inline onclick="fn('${id}')". An id containing a quote
+// used to break straight out of the attribute and execute.
+document.querySelector('main').addEventListener('click', (event) => {
+  const btn = event.target.closest('[data-action]');
+  if (!btn) return;
+  const { action, id } = btn.dataset;
+  if (action === 'toggle-kitchen') toggleKitchen(id);
+  if (action === 'verify-license') verifyLicense(id);
+  if (action === 'toggle-coupon') toggleCoupon(id);
+  if (action === 'delete-coupon') deleteCoupon(id);
+});
+
 // ─── Overview ──────────────────────────────────────────
 async function loadOverview() {
   const orders = await api('/orders/admin/all');
-  if (!Array.isArray(orders)) { document.getElementById('recent-orders').innerHTML = '<tr><td colspan="6" class="empty">Could not load orders — check you are logged in as admin.</td></tr>'; return; }
+  if (!Array.isArray(orders)) { document.getElementById('recent-orders').innerHTML = row(6, 'Could not load orders — check you are logged in as admin.'); return; }
   const stats = { total: orders.length, placed: 0, delivered: 0, revenue: 0 };
   orders.forEach(o => {
-    if (o.status === 'delivered') { stats.delivered++; stats.revenue += parseFloat(o.total); }
+    if (o.status === 'delivered') { stats.delivered++; stats.revenue += Number(o.total) || 0; }
     if (o.status === 'placed') stats.placed++;
   });
 
@@ -309,46 +350,52 @@ async function loadOverview() {
     <div class="stat"><div class="num">${stats.total}</div><div class="lbl">Total Orders</div></div>
     <div class="stat"><div class="num">${stats.placed}</div><div class="lbl">Pending</div></div>
     <div class="stat"><div class="num">${stats.delivered}</div><div class="lbl">Delivered</div></div>
-    <div class="stat"><div class="num">₹${stats.revenue.toFixed(0)}</div><div class="lbl">Revenue</div></div>
+    <div class="stat"><div class="num">₹${num(stats.revenue)}</div><div class="lbl">Revenue</div></div>
   `;
 
   const recent = orders.slice(0, 10);
   document.getElementById('recent-orders').innerHTML = recent.map(o => `
     <tr>
-      <td class="mono">#${o.id.slice(-8)}</td>
-      <td>${o.customerName}</td>
-      <td class="mono">${o.kitchenId}</td>
-      <td>₹${o.total}</td>
-      <td><span class="badge ${o.status}">${o.status.replace(/_/g,' ')}</span></td>
-      <td class="mono">${new Date(o.placedAt).toLocaleString('en-IN')}</td>
+      <td class="mono">#${shortId(o.id)}</td>
+      <td>${esc(o.customerName)}</td>
+      <td class="mono">${esc(o.kitchenId)}</td>
+      <td>₹${num(o.total, 2)}</td>
+      <td><span class="badge ${cls(o.status)}">${esc(String(o.status ?? '').replace(/_/g, ' '))}</span></td>
+      <td class="mono">${when(o.placedAt)}</td>
     </tr>
-  `).join('') || '<tr><td colspan="6" class="empty">No orders yet</td></tr>';
+  `).join('') || row(6, 'No orders yet');
 }
 
 // ─── Kitchens ──────────────────────────────────────────
 async function loadKitchens() {
   const kitchens = await api('/kitchens/admin/all');
-  if (!Array.isArray(kitchens)) { document.getElementById('kitchens-list').innerHTML = '<tr><td colspan="6" class="empty">Could not load kitchens.</td></tr>'; return; }
+  if (!Array.isArray(kitchens)) { document.getElementById('kitchens-list').innerHTML = row(7, 'Could not load kitchens.'); return; }
   kitchensCache = kitchens;
-  document.getElementById('kitchens-list').innerHTML = kitchens.map(k => `
+  document.getElementById('kitchens-list').innerHTML = kitchens.map(k => {
+    const contact = [
+      k.email ? '📧 ' + esc(k.email) : '',
+      k.phone ? '📱 ' + esc(k.phone) : '',
+      k.address ? '📍 ' + esc(k.address) : '',
+    ].filter(Boolean).join('<br>') || '<span style="color:var(--text-faint)">—</span>';
+
+    return `
     <tr>
-      <td class="mono">${k.id}</td>
-      <td>${k.name}</td>
-      <td><span class="badge ${k.type}">${k.type}</span></td>
+      <td class="mono">${esc(k.id)}</td>
+      <td>${esc(k.name)}</td>
+      <td><span class="badge ${cls(k.type)}">${esc(k.type)}</span></td>
       <td><span class="badge ${k.active ? 'active' : 'pending'}">${k.active ? 'Active' : 'Pending / Inactive'}</span></td>
+      <td><div style="font-size:12px;">${contact}</div></td>
+      <td>${esc(k.rating_text || 'N/A')}</td>
       <td>
-        <div style="font-size:12px;">${k.email ? '📧 ' + k.email + '<br>' : ''}${k.phone ? '📱 ' + k.phone + '<br>' : ''}${k.address ? '📍 ' + k.address : ''}${!k.email && !k.phone && !k.address ? '<span style="color:var(--text-faint)">—</span>' : ''}</div>
-      </td>
-      <td>${k.rating_text || 'N/A'}</td>
-      <td>
-        <button class="btn-sm ${k.active ? 'danger' : 'success'}" onclick="toggleKitchen('${k.id}')">${k.active ? 'Deactivate' : 'Approve'}</button>
+        <button class="btn-sm ${k.active ? 'danger' : 'success'}" data-action="toggle-kitchen" data-id="${esc(k.id)}">${k.active ? 'Deactivate' : 'Approve'}</button>
       </td>
     </tr>
-  `).join('') || '<tr><td colspan="7" class="empty">No kitchens registered</td></tr>';
+  `;
+  }).join('') || row(7, 'No kitchens registered');
 }
 
 async function toggleKitchen(id) {
-  const res = await api('/kitchens/' + id + '/toggle-active', { method: 'PATCH' });
+  const res = await api('/kitchens/' + encodeURIComponent(id) + '/toggle-active', { method: 'PATCH' });
   if (res.success) {
     showToast(res.active ? 'Kitchen approved and activated' : 'Kitchen deactivated');
     loadKitchens();
@@ -397,19 +444,19 @@ document.getElementById('refresh-kitchens-btn').addEventListener('click', loadKi
 // ─── Orders ────────────────────────────────────────────
 async function loadOrders() {
   const filter = document.getElementById('order-filter').value;
-  const orders = await api('/orders/admin/all' + (filter ? '?status=' + filter : ''));
-  if (!Array.isArray(orders)) { document.getElementById('all-orders').innerHTML = '<tr><td colspan="7" class="empty">Could not load orders.</td></tr>'; return; }
+  const orders = await api('/orders/admin/all' + (filter ? '?status=' + encodeURIComponent(filter) : ''));
+  if (!Array.isArray(orders)) { document.getElementById('all-orders').innerHTML = row(7, 'Could not load orders.'); return; }
   document.getElementById('all-orders').innerHTML = orders.map(o => `
     <tr>
-      <td class="mono">#${o.id.slice(-8)}</td>
-      <td>${o.customerName}</td>
-      <td class="mono">${o.kitchenId}</td>
-      <td>₹${o.total}</td>
-      <td>${o.paid ? '✅ Paid' : '💵 ' + (o.paymentMethod || 'COD')}</td>
-      <td><span class="badge ${o.status}">${o.status.replace(/_/g,' ')}</span></td>
-      <td class="mono">${new Date(o.placedAt).toLocaleDateString('en-IN')}</td>
+      <td class="mono">#${shortId(o.id)}</td>
+      <td>${esc(o.customerName)}</td>
+      <td class="mono">${esc(o.kitchenId)}</td>
+      <td>₹${num(o.total, 2)}</td>
+      <td>${o.paid ? '✅ Paid' : '💵 ' + esc(o.paymentMethod || 'COD')}</td>
+      <td><span class="badge ${cls(o.status)}">${esc(String(o.status ?? '').replace(/_/g, ' '))}</span></td>
+      <td class="mono">${when(o.placedAt, 'date')}</td>
     </tr>
-  `).join('') || '<tr><td colspan="7" class="empty">No orders found</td></tr>';
+  `).join('') || row(7, 'No orders found');
 }
 
 document.getElementById('order-filter').addEventListener('change', loadOrders);
@@ -417,52 +464,54 @@ document.getElementById('order-filter').addEventListener('change', loadOrders);
 // ─── Menu (aggregated across every kitchen) ───────────
 async function loadMenu() {
   const tbody = document.getElementById('menu-list');
-  tbody.innerHTML = '<tr><td colspan="8" class="empty">Loading…</td></tr>';
+  tbody.innerHTML = row(8, 'Loading…');
   const kitchens = kitchensCache.length ? kitchensCache : await api('/kitchens/admin/all');
-  if (!Array.isArray(kitchens) || !kitchens.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">No kitchens yet</td></tr>'; return; }
+  if (!Array.isArray(kitchens) || !kitchens.length) { tbody.innerHTML = row(8, 'No kitchens yet'); return; }
 
   const perKitchen = await Promise.all(kitchens.map(async k => {
-    const items = await api('/kitchens/' + k.id + '/menu');
+    const items = await api('/kitchens/' + encodeURIComponent(k.id) + '/menu');
     return Array.isArray(items) ? items.map(i => ({ ...i, kitchenName: k.name, kitchenId: k.id })) : [];
   }));
   const allItems = perKitchen.flat();
 
   tbody.innerHTML = allItems.map(i => `
     <tr>
-      <td>${i.name}</td>
-      <td>${i.kitchenName} <span class="mono" style="color:var(--text-faint);">(${i.kitchenId})</span></td>
-      <td><span class="badge active">${i.category || 'Other'}</span></td>
-      <td><span class="badge ${i.tier}">${i.tier}</span></td>
-      <td>${(i.slots || []).join(', ')}</td>
-      <td>₹${i.price}</td>
-      <td>${(i.allergens || []).join(', ') || '—'}</td>
+      <td>${esc(i.name)}</td>
+      <td>${esc(i.kitchenName)} <span class="mono" style="color:var(--text-faint);">(${esc(i.kitchenId)})</span></td>
+      <td><span class="badge active">${esc(i.category || 'Other')}</span></td>
+      <td><span class="badge ${cls(i.tier)}">${esc(i.tier)}</span></td>
+      <td>${esc((i.slots || []).join(', '))}</td>
+      <td>₹${num(i.price, 2)}</td>
+      <td>${esc((i.allergens || []).join(', ')) || '—'}</td>
       <td><span class="badge ${i.active ? 'active' : 'inactive'}">${i.active ? 'Yes' : 'No'}</span></td>
     </tr>
-  `).join('') || '<tr><td colspan="8" class="empty">No menu items yet</td></tr>';
+  `).join('') || row(8, 'No menu items yet');
 }
 
 // ─── Delivery Partners ─────────────────────────────────
 async function loadDeliveryPartners() {
   const partners = await api('/delivery/available?limit=100');
-  if (!Array.isArray(partners)) { document.getElementById('delivery-list').innerHTML = '<tr><td colspan="7" class="empty">Could not load delivery partners.</td></tr>'; return; }
+  if (!Array.isArray(partners)) { document.getElementById('delivery-list').innerHTML = row(7, 'Could not load delivery partners.'); return; }
   document.getElementById('delivery-list').innerHTML = partners.map(p => `
     <tr>
-      <td>${p.name}</td>
-      <td class="mono">${p.phone}</td>
-      <td>${p.vehicle_type} ${p.vehicle_number ? '(' + p.vehicle_number + ')' : ''}</td>
+      <td>${esc(p.name)}</td>
+      <td class="mono">${esc(p.phone)}</td>
+      <td>${esc(p.vehicle_type)} ${p.vehicle_number ? '(' + esc(p.vehicle_number) + ')' : ''}</td>
       <td><span class="badge ${p.license_verified ? 'active' : 'pending'}">${p.license_verified ? '✅ Verified' : '⏳ Pending'}</span></td>
-      <td><span class="badge ${p.status === 'available' ? 'active' : 'inactive'}">${p.status}</span></td>
-      <td>₹${p.earnings || 0}</td>
+      <td><span class="badge ${p.status === 'available' ? 'active' : 'inactive'}">${esc(p.status)}</span></td>
+      <td>₹${num(p.earnings, 2)}</td>
       <td>
-        ${!p.license_verified ? `<button class="btn-sm success" onclick="verifyLicense(${p.id})">✅ Verify License</button>` : `<span style="color:var(--curry);font-size:12px;">Verified</span>`}
+        ${!p.license_verified
+          ? `<button class="btn-sm success" data-action="verify-license" data-id="${esc(p.id)}">✅ Verify License</button>`
+          : '<span style="color:var(--curry);font-size:12px;">Verified</span>'}
       </td>
     </tr>
-  `).join('') || '<tr><td colspan="7" class="empty">No delivery partners registered</td></tr>';
+  `).join('') || row(7, 'No delivery partners registered');
 }
 
 async function verifyLicense(partnerId) {
   if (!confirm('Confirm this delivery partner has a valid driving license?')) return;
-  const res = await api('/delivery/verify-license/' + partnerId, { method: 'PATCH' });
+  const res = await api('/delivery/verify-license/' + encodeURIComponent(partnerId), { method: 'PATCH' });
   if (res.success) {
     showToast('License verified! Partner can now accept deliveries.');
     loadDeliveryPartners();
@@ -475,33 +524,33 @@ async function verifyLicense(partnerId) {
 async function loadCoupons() {
   const coupons = await api('/coupons');
   const tbody = document.getElementById('coupons-list');
-  if (!Array.isArray(coupons)) { tbody.innerHTML = '<tr><td colspan="8" class="empty">Could not load coupons.</td></tr>'; return; }
+  if (!Array.isArray(coupons)) { tbody.innerHTML = row(8, 'Could not load coupons.'); return; }
   tbody.innerHTML = coupons.map(c => `
     <tr>
-      <td class="mono">${c.code}</td>
+      <td class="mono">${esc(c.code)}</td>
       <td>${c.discount_type === 'percentage' ? 'Percentage' : 'Fixed'}</td>
-      <td>${c.discount_type === 'percentage' ? c.discount_value + '%' : '₹' + c.discount_value}</td>
-      <td>₹${c.min_order}</td>
-      <td>${c.used_count}</td>
-      <td>${c.usage_limit}</td>
+      <td>${c.discount_type === 'percentage' ? num(c.discount_value) + '%' : '₹' + num(c.discount_value, 2)}</td>
+      <td>₹${num(c.min_order, 2)}</td>
+      <td>${esc(c.used_count)}</td>
+      <td>${esc(c.usage_limit)}</td>
       <td><span class="badge ${c.active ? 'active' : 'inactive'}">${c.active ? 'Active' : 'Inactive'}</span></td>
       <td>
-        <button class="btn-sm ${c.active ? 'danger' : 'success'}" onclick="toggleCoupon(${c.id})">${c.active ? 'Deactivate' : 'Activate'}</button>
-        <button class="btn-sm danger" onclick="deleteCoupon(${c.id})">Delete</button>
+        <button class="btn-sm ${c.active ? 'danger' : 'success'}" data-action="toggle-coupon" data-id="${esc(c.id)}">${c.active ? 'Deactivate' : 'Activate'}</button>
+        <button class="btn-sm danger" data-action="delete-coupon" data-id="${esc(c.id)}">Delete</button>
       </td>
     </tr>
-  `).join('') || '<tr><td colspan="8" class="empty">No coupons yet</td></tr>';
+  `).join('') || row(8, 'No coupons yet');
 }
 
 async function toggleCoupon(id) {
-  const res = await api('/coupons/' + id + '/toggle', { method: 'PATCH' });
+  const res = await api('/coupons/' + encodeURIComponent(id) + '/toggle', { method: 'PATCH' });
   if (res.success) { showToast('Coupon updated'); loadCoupons(); }
   else showToast(res.error || 'Could not update coupon', true);
 }
 
 async function deleteCoupon(id) {
   if (!confirm('Delete this coupon?')) return;
-  const res = await api('/coupons/' + id, { method: 'DELETE' });
+  const res = await api('/coupons/' + encodeURIComponent(id), { method: 'DELETE' });
   if (res.success) { showToast('Coupon deleted'); loadCoupons(); }
   else showToast(res.error || 'Could not delete coupon', true);
 }
@@ -533,6 +582,5 @@ document.getElementById('coupon-form-el').addEventListener('submit', async (e) =
   }
 });
 </script>
-<script defer src="/v3-ui.js"></script>
 </body>
 </html>
