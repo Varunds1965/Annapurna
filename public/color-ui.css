@@ -1,0 +1,82 @@
+/* Annapurna Color UI, additive only */
+:root {
+  --cu-ink: oklch(23% .045 55);
+  --cu-ink-soft: oklch(38% .055 55);
+  --cu-muted: oklch(52% .045 65);
+  --cu-paper: oklch(97% .025 86);
+  --cu-surface: oklch(99% .012 86);
+  --cu-surface-2: oklch(94% .045 83);
+  --cu-line: oklch(86% .055 78);
+  --cu-orange: oklch(65% .19 38);
+  --cu-orange-soft: oklch(91% .08 42);
+  --cu-yellow: oklch(78% .17 82);
+  --cu-yellow-soft: oklch(94% .09 87);
+  --cu-green: oklch(54% .14 145);
+  --cu-green-soft: oklch(91% .08 145);
+  --cu-blue: oklch(58% .16 240);
+  --cu-blue-soft: oklch(91% .08 238);
+  --cu-pink: oklch(66% .17 350);
+  --cu-pink-soft: oklch(93% .08 350);
+  --cu-purple: oklch(56% .16 300);
+  --cu-purple-soft: oklch(92% .08 300);
+  --cu-danger: oklch(55% .18 25);
+  --cu-danger-soft: oklch(93% .06 25);
+  --cu-radius-sm: 12px;
+  --cu-radius: 20px;
+  --cu-radius-lg: 28px;
+  --cu-shadow-sm: 0 8px 22px oklch(28% .04 55 / .07);
+  --cu-shadow: 0 18px 50px oklch(28% .04 55 / .11);
+  --cu-ease: cubic-bezier(.16, 1, .3, 1);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background:
+    radial-gradient(circle at 8% 6%, var(--cu-yellow-soft), transparent 28rem),
+    radial-gradient(circle at 94% 18%, var(--cu-pink-soft), transparent 26rem),
+    var(--cu-paper);
+  color: var(--cu-ink);
+  font-family: "DM Sans", Inter, system-ui, sans-serif;
+  line-height: 1.5;
+  font-optical-sizing: auto;
+}
+h1, h2, h3, h4, .display, .section-title { font-family: Fraunces, Georgia, serif; text-wrap: balance; }
+p { text-wrap: pretty; }
+button, input, select, textarea { font: inherit; }
+button { min-height: 44px; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible {
+  outline: 3px solid var(--cu-blue);
+  outline-offset: 3px;
+}
+
+/* Shared chrome */
+.nav, header.top, header {
+  background: var(--cu-surface);
+  border-color: var(--cu-line);
+  box-shadow: 0 5px 24px oklch(30% .04 55 / .06);
+}
+.logo, .brand, header h1 { color: var(--cu-ink); }
+.logo .mark, .brand-icon, .brand-icon-lg {
+  background: var(--cu-orange);
+  box-shadow: 0 8px 18px oklch(65% .19 38 / .2);
+}
+.nav-search input, .field input, .notes-in, .coupon-row input,
+.form-panel input, .form-panel select, .form-panel textarea,
+input, select, textarea {
+  background: var(--cu-surface);
+  border-color: var(--cu-line);
+  color: var(--cu-ink);
+}
+.nav-search input:focus, .field input:focus, input:focus, select:focus, textarea:focus {
+  border-color: var(--cu-orange);
+  box-shadow: 0 0 0 4px oklch(65% .19 38 / .14);
+}
+.icon-btn, .user-chip, .chip, .meal-tab, .pay-opt, .refresh-btn, .theme-btn {
+  background: var(--cu-surface);
+  border-color: var(--cu-line);
+}
+.icon-btn:hover, .chip:hover, .meal-tab:hover, .pay-opt:hover, .refresh-btn:hover, .theme-btn:hover {
+  border-color: var(--cu-orange);
+  transform: translateY(-2px);
+}

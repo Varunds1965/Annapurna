@@ -1,3 +1,8 @@
+const { Router } = require("express");
+const router = Router();
+const { asyncHandler } = require("../middleware/errorHandler");
+const { pool } = require("../db/pool");
+
 router.post('/validate', asyncHandler(async (req, res) => {
   const { code, orderTotal } = req.body;
   if (!code) return res.status(400).json({ error: 'code is required' });
@@ -39,3 +44,4 @@ router.post('/validate', asyncHandler(async (req, res) => {
     description: coupon.description,
   });
 }));
+module.exports = router;
