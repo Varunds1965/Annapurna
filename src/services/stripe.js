@@ -1,8 +1,14 @@
+/**
+ * Stripe Payment Integration
+ * Raw HTTPS calls to the Stripe REST API (no SDK dependency).
+ */
+const https = require('https');
+
 async function refundStripePayment(paymentIntentId, amount = null) {
   const secretKey = process.env.STRIPE_SECRET_KEY;
   if (!secretKey) return { success: false, error: 'Stripe not configured' };
 
-  // FIXED: Stripe refund API expects form-urlencoded, not JSON
+  // Stripe refund API expects form-urlencoded, not JSON
   const formParams = new URLSearchParams({ payment_intent: paymentIntentId });
   if (amount) formParams.append('amount', Math.round(amount * 100).toString());
   const postBody = formParams.toString();
@@ -42,3 +48,5 @@ async function refundStripePayment(paymentIntentId, amount = null) {
     req.end();
   });
 }
+
+module.exports = { refundStripePayment };
