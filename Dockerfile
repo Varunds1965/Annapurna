@@ -1,10 +1,10 @@
-# ── Thali Plan — production image ──
+# ── Annapurna production image ──
 FROM node:20-alpine
 
 ENV NODE_ENV=production
 WORKDIR /app
 
-# Install dependencies first (better layer caching)
+# Install dependencies first for better layer caching
 COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
