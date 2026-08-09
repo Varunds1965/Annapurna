@@ -30,6 +30,7 @@ jobs:
         run: npm run validate-env
         env:
           NODE_ENV: test
+          DB_PASSWORD: ci-only-database-password
           JWT_SECRET: ci-only-secret-that-is-at-least-32-characters
           ADMIN_EMAIL: admin@example.com
           ADMIN_PASSWORD: ci-only-password
