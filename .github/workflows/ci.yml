@@ -12,36 +12,58 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-only-database-password
+          POSTGRES_DB: thaliplan
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d thaliplan"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      PORT: 3000
+      HOST: 127.0.0.1
+      DB_USER: postgres
+      DB_HOST: 127.0.0.1
+      DB_NAME: thaliplan
+      DB_PASSWORD: ci-only-database-password
+      DB_PORT: 5432
+      JWT_SECRET: ci-only-secret-that-is-at-least-32-characters
+      ADMIN_EMAIL: admin@example.com
+      ADMIN_PASSWORD: ci-only-password
+      CORS_ORIGIN: http://127.0.0.1:3000
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-
-      - name: Validate environment contract
+      - name: Validate environment
         run: npm run validate-env
-        env:
-          NODE_ENV: test
-          DB_PASSWORD: ci-only-database-password
-          JWT_SECRET: ci-only-secret-that-is-at-least-32-characters
-          ADMIN_EMAIL: admin@example.com
-          ADMIN_PASSWORD: ci-only-password
-
-      - name: Run unit tests
+      - name: Initialize database
+        run: npm run setup-db
+      - name: Start application
+        run: |
+          node server.js > /tmp/annapurna-server.log 2>&1 &
+          echo $! > /tmp/annapurna-server.pid
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3000/api/health; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/annapurna-server.log
+          exit 1
+      - name: Run API tests
         run: npm test
         env:
-          NODE_ENV: test
-          DB_PASSWORD: ci-only-database-password
-          JWT_SECRET: ci-only-secret-that-is-at-least-32-characters
-          ADMIN_EMAIL: admin@example.com
-          ADMIN_PASSWORD: ci-only-password
-
+          TEST_URL: http://127.0.0.1:3000
       - name: Run lint
         run: npm run lint
