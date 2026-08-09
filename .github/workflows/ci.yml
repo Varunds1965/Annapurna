@@ -56,7 +56,10 @@ jobs:
           node server.js > /tmp/annapurna-server.log 2>&1 &
           echo $! > /tmp/annapurna-server.pid
           for i in {1..30}; do
-            if curl --fail --silent http://127.0.0.1:3000/api/health; then exit 0; fi
+            if curl --fail --silent http://127.0.0.1:3000/api/health > /tmp/health.json; then
+              cat /tmp/health.json
+              exit 0
+            fi
             sleep 1
           done
           cat /tmp/annapurna-server.log
@@ -67,3 +70,14 @@ jobs:
           TEST_URL: http://127.0.0.1:3000
       - name: Run lint
         run: npm run lint
+      - name: Print diagnostics on failure
+        if: failure()
+        run: |
+          echo '--- server log ---'
+          test ! -f /tmp/annapurna-server.log || cat /tmp/annapurna-server.log
+          echo '--- health response ---'
+          test ! -f /tmp/health.json || cat /tmp/health.json
+          echo '--- package versions ---'
+          node --version
+          npm --version
+          npm ls --depth=0 || true
