@@ -4,9 +4,11 @@ FROM node:20-alpine
 ENV NODE_ENV=production
 WORKDIR /app
 
-# Install dependencies first for better layer caching
+# Install dependencies first for better layer caching.
+# npm install is used until package-lock.json is regenerated against
+# package.json; npm ci currently fails because the committed lockfile is stale.
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
 
 # Copy application code
 COPY server.js ./
