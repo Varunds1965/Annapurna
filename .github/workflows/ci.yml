@@ -35,8 +35,38 @@ jobs:
           ADMIN_EMAIL: admin@example.com
           ADMIN_PASSWORD: ci-only-password
 
+      - name: Start application for API tests
+        run: |
+          node server.js > /tmp/annapurna-server.log 2>&1 &
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3000/api/health > /tmp/health.json; then
+              cat /tmp/health.json
+              break
+            fi
+            sleep 1
+          done
+          if ! curl --fail --silent http://127.0.0.1:3000/api/health > /tmp/health.json; then
+            cat /tmp/annapurna-server.log
+            exit 1
+          fi
+        env:
+          NODE_ENV: test
+          PORT: 3000
+          HOST: 127.0.0.1
+          DB_USER: postgres
+          DB_HOST: localhost
+          DB_NAME: thaliplan
+          DB_PASSWORD: ci-only-database-password
+          DB_PORT: 5432
+          JWT_SECRET: ci-only-secret-that-is-at-least-32-characters
+          ADMIN_EMAIL: admin@example.com
+          ADMIN_PASSWORD: ci-only-password
+          CORS_ORIGIN: http://127.0.0.1:3000
+
       - name: Run tests
         run: npm test
+        env:
+          TEST_URL: http://127.0.0.1:3000
 
       - name: Run lint
         run: npm run lint
