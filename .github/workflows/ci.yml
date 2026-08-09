@@ -13,6 +13,33 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-only-database-password
+          POSTGRES_DB: thaliplan
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d thaliplan"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      PORT: 3000
+      HOST: 127.0.0.1
+      DB_USER: postgres
+      DB_HOST: 127.0.0.1
+      DB_NAME: thaliplan
+      DB_PASSWORD: ci-only-database-password
+      DB_PORT: 5432
+      JWT_SECRET: ci-only-secret-that-is-at-least-32-characters
+      ADMIN_EMAIL: admin@example.com
+      ADMIN_PASSWORD: ci-only-password
+      CORS_ORIGIN: http://127.0.0.1:3000
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -28,12 +55,9 @@ jobs:
 
       - name: Validate environment contract
         run: npm run validate-env
-        env:
-          NODE_ENV: test
-          DB_PASSWORD: ci-only-database-password
-          JWT_SECRET: ci-only-secret-that-is-at-least-32-characters
-          ADMIN_EMAIL: admin@example.com
-          ADMIN_PASSWORD: ci-only-password
+
+      - name: Initialize database
+        run: npm run setup-db
 
       - name: Start application for API tests
         run: |
@@ -49,19 +73,6 @@ jobs:
             cat /tmp/annapurna-server.log
             exit 1
           fi
-        env:
-          NODE_ENV: test
-          PORT: 3000
-          HOST: 127.0.0.1
-          DB_USER: postgres
-          DB_HOST: localhost
-          DB_NAME: thaliplan
-          DB_PASSWORD: ci-only-database-password
-          DB_PORT: 5432
-          JWT_SECRET: ci-only-secret-that-is-at-least-32-characters
-          ADMIN_EMAIL: admin@example.com
-          ADMIN_PASSWORD: ci-only-password
-          CORS_ORIGIN: http://127.0.0.1:3000
 
       - name: Run tests
         run: npm test
